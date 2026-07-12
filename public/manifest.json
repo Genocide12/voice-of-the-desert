@@ -1,0 +1,40 @@
+{
+  "name": "Голос Пустыни · Voice of the Desert",
+  "short_name": "Пустыня",
+  "description": "Медитативная игра о странствующем монахе, пересекающем бесконечную пустыню коанов.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1a1a2e",
+  "theme_color": "#f5e6c8",
+  "lang": "ru",
+  "categories": ["games", "entertainment", "lifestyle"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Играть · Play",
+      "url": "/?action=play",
+      "description": "Continue the journey"
+    }
+  ]
+}

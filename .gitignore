@@ -1,21 +1,13 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
 # dependencies
-node_modules
+/node_modules
 /.pnp
 .pnp.*
 .yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
-
-# testing
-/coverage
 
 # next.js
 /.next/
 /out/
+next-env.d.ts
 
 # production
 /build
@@ -30,25 +22,60 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files (NEVER commit)
+.env
+.env*.local
+.env.local
+.env.development
+.env.production
+.env.example.local
 
 # vercel
 .vercel
 
-
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-local-*
-.claude
-.z-ai-config
+
+# logs
 *.log
 dev.log
-dev.out.log
-test
-prompt
-
 server.log
-# Skills directory
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# prisma
+/prisma/migrations/dev.db*
+
+# scripts artifacts
+/scripts/__pycache__/
+
+# z-ai internal
+.zscripts/
+.zai/
+
+# Deploy scripts with tokens (NEVER commit)
+/scripts/deploy.sh
+/scripts/*.env
+
+# Skills directory (internal, not part of game)
 /skills/
+
+# DB files
+/db/
+*.db
+*.db-journal
+
+# Download artifacts
+/download/
+
+# Examples and mini-services (not part of the game)
+/examples/
+/mini-services/
+
+# Caddyfile (local gateway config)
+/Caddyfile

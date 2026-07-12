@@ -1,38 +1,49 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Geist } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  subsets: ["latin", "cyrillic"],
 });
 
 export const metadata: Metadata = {
-  title: "Z.ai Code Scaffold - AI-Powered Development",
-  description: "Modern Next.js scaffold optimized for AI-powered development with Z.ai. Built with TypeScript, Tailwind CSS, and shadcn/ui.",
-  keywords: ["Z.ai", "Next.js", "TypeScript", "Tailwind CSS", "shadcn/ui", "AI development", "React"],
-  authors: [{ name: "Z.ai Team" }],
+  title: "Голос Пустыни · Voice of the Desert",
+  description:
+    "Медитативная игра о странствующем монахе, пересекающем бесконечную пустыню. Каждый день пустыня задаёт тебе коан.",
+  keywords: ["koan", "desert", "meditation", "philosophy", "пустыня", "коан", "монах"],
+  authors: [{ name: "Voice of the Desert" }],
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Голос Пустыни",
+  },
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/icon-192.png", sizes: "192x192" }],
   },
   openGraph: {
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
-    url: "https://chat.z.ai",
-    siteName: "Z.ai",
+    title: "Голос Пустыни · Voice of the Desert",
+    description: "Медитативная игра-странствие монаха через бесконечную пустыню коанов.",
     type: "website",
   },
-  twitter: {
-    card: "summary_large_image",
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
-  },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f5e6c8" },
+    { media: "(prefers-color-scheme: dark)", color: "#1a1a2e" },
+  ],
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -41,9 +52,25 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="ru" suppressHydrationWarning>
+      <head>
+        {/* Telegram WebApp SDK */}
+        <script src="https://telegram.org/js/telegram-web-app.js" async />
+        {/* Service worker registration */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                  navigator.serviceWorker.register('/sw.js').catch(() => {});
+                });
+              }
+            `,
+          }}
+        />
+      </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
+        className={`${geistSans.variable} antialiased bg-background text-foreground min-h-screen overflow-x-hidden`}
       >
         {children}
         <Toaster />
