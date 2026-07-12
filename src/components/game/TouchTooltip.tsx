@@ -1,90 +1,87 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 interface TouchTooltipProps {
   content: ReactNode;
   children: ReactNode;
-  side?: 'top' | 'bottom' | 'left' | 'right';
+  side?: 'top' | 'bottom';
   className?: string;
 }
 
 /**
- * Tooltip that works on both desktop (hover) and mobile (long-press 500ms).
- * On touch devices, press-and-hold reveals the tooltip.
- *
- * IMPORTANT: Does NOT use touch-action:manipulation (it blocks long-press on some browsers).
- * Instead, uses pointer events for reliable cross-platform detection.
+ * Simple, reliable tooltip — works on desktop (hover) and mobile (long-press 350ms).
+ * Uses pointer events (works on mouse + touch + pen).
+ * Positions tooltip relative to element using getBoundingClientRect.
  */
 export function TouchTooltip({ content, children, side = 'top', className }: TouchTooltipProps) {
   const [visible, setVisible] = useState(false);
-  const [coords, setCoords] = useState<{ x: number; y: number } | null>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressed = useRef(false);
-  const touchStartPos = useRef<{ x: number; y: number } | null>(null);
 
-  const show = (x?: number, y?: number) => {
-    if (x !== undefined && y !== undefined) setCoords({ x, y });
-    else setCoords(null);
+  const show = () => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const tooltipWidth = 240;
+    let left = rect.left + rect.width / 2 - tooltipWidth / 2;
+    // Keep on screen
+    left = Math.max(8, Math.min(left, window.innerWidth - tooltipWidth - 8));
+    let top: number;
+    if (side === 'top') {
+      top = rect.top - 8; // tooltip will be above, translated up by its height
+    } else {
+      top = rect.bottom + 8;
+    }
+    setPos({ top, left });
     setVisible(true);
   };
 
   const hide = () => {
     setVisible(false);
-    setCoords(null);
+    setPos(null);
   };
 
   // Desktop hover
   const handleMouseEnter = () => show();
   const handleMouseLeave = () => hide();
 
-  // Mobile long-press — 500ms threshold
-  const handleTouchStart = (e: React.TouchEvent) => {
+  // Mobile long-press via pointer events
+  const handlePointerDown = () => {
     longPressed.current = false;
-    const touch = e.touches[0];
-    if (!touch) return;
-    touchStartPos.current = { x: touch.clientX, y: touch.clientY };
     pressTimer.current = setTimeout(() => {
       longPressed.current = true;
-      show(touch.clientX, touch.clientY);
-      // Light vibration if supported (Android Chrome)
+      show();
+      // Light vibration on Android
       try {
         if (navigator.vibrate) navigator.vibrate(15);
       } catch {
         /* ignore */
       }
-    }, 500);
+    }, 350);
   };
 
-  const handleTouchEnd = () => {
+  const handlePointerUp = () => {
     if (pressTimer.current) {
       clearTimeout(pressTimer.current);
       pressTimer.current = null;
     }
     if (longPressed.current) {
-      // Keep tooltip visible for 2.5 seconds after release
       setTimeout(() => hide(), 2500);
     }
   };
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    // Cancel long-press if finger moves more than 10px (scrolling)
-    if (pressTimer.current && touchStartPos.current) {
-      const touch = e.touches[0];
-      if (touch) {
-        const dx = Math.abs(touch.clientX - touchStartPos.current.x);
-        const dy = Math.abs(touch.clientY - touchStartPos.current.y);
-        if (dx > 10 || dy > 10) {
-          clearTimeout(pressTimer.current);
-          pressTimer.current = null;
-          hide();
-        }
-      }
+  const handlePointerMove = () => {
+    if (pressTimer.current && !longPressed.current) {
+      // Cancel on move (scrolling)
+      clearTimeout(pressTimer.current);
+      pressTimer.current = null;
     }
   };
 
-  // Prevent native context menu on long-press (iOS/Android)
+  // Prevent context menu on long-press
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
@@ -95,42 +92,35 @@ export function TouchTooltip({ content, children, side = 'top', className }: Tou
     return () => el.removeEventListener('contextmenu', prevent);
   }, []);
 
-  const sideClass =
-    side === 'top'
-      ? 'bottom-full left-1/2 -translate-x-1/2 mb-2'
-      : side === 'bottom'
-        ? 'top-full left-1/2 -translate-x-1/2 mt-2'
-        : side === 'left'
-          ? 'right-full top-1/2 -translate-y-1/2 mr-2'
-          : 'left-full top-1/2 -translate-y-1/2 ml-2';
-
-  // Style: only prevent native callout, do NOT use touch-action:manipulation
-  const wrapperStyle: CSSProperties = {
-    WebkitTouchCallout: 'none',
-  };
-
   return (
-    <div
-      ref={wrapRef}
-      className={className ?? 'relative inline-flex'}
-      style={wrapperStyle}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-      onTouchMove={handleTouchMove}
-    >
-      {children}
-      {visible && (
+    <>
+      <div
+        ref={wrapRef}
+        className={className ?? 'relative inline-flex'}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerMove={handlePointerMove}
+        style={{ WebkitTouchCallout: 'none', touchAction: 'auto' }}
+      >
+        {children}
+      </div>
+      {visible && pos && (
         <div
-          className={`pointer-events-none absolute z-50 ${sideClass} ${coords ? 'fixed' : ''}`}
-          style={coords ? { left: coords.x, top: coords.y, transform: 'translate(-50%, -120%)' } : undefined}
+          className="fixed z-[9999] pointer-events-none"
+          style={{
+            top: side === 'top' ? pos.top : pos.top,
+            left: pos.left,
+            width: 240,
+            transform: side === 'top' ? 'translateY(-100%)' : 'translateY(0)',
+          }}
         >
-          <div className="rounded-lg bg-foreground/95 px-3 py-2 text-xs text-background shadow-xl max-w-[240px] text-center leading-relaxed">
+          <div className="rounded-lg bg-foreground/95 px-3 py-2 text-xs text-background shadow-xl text-center leading-relaxed">
             {content}
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

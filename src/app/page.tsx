@@ -294,17 +294,17 @@ export default function Home() {
 
         {/* Stats bar (only when game active) */}
         {state?.started && state?.phase && PHASE_ICONS[state.phase] && (
-          <div className="px-4 py-2 flex items-center justify-between gap-2 text-xs">
-            <TouchTooltip content={tr(UI.tooltipPhase, lang)} side="bottom" className="relative flex-1 cursor-help">
+          <div className="px-4 py-2 flex items-stretch justify-between gap-2 text-xs">
+            <TouchTooltip content={tr(UI.tooltipPhase, lang)} side="bottom" className="flex-1 flex">
               <Stat icon={PHASE_ICONS[state.phase]} label={tr(UI.phase, lang)} value={tr(state.phase === 'day' ? UI.phaseDay : state.phase === 'dusk' ? UI.phaseDusk : state.phase === 'night' ? UI.phaseNight : UI.phaseDawn, lang)} />
             </TouchTooltip>
-            <TouchTooltip content={tr(UI.tooltipDay, lang)} side="bottom" className="relative flex-1 cursor-help">
+            <TouchTooltip content={tr(UI.tooltipDay, lang)} side="bottom" className="flex-1 flex">
               <Stat icon={Sun} label={tr(UI.day, lang)} value={String(state.day ?? 1)} />
             </TouchTooltip>
-            <TouchTooltip content={tr(UI.tooltipDistance, lang)} side="bottom" className="relative flex-1 cursor-help">
+            <TouchTooltip content={tr(UI.tooltipDistance, lang)} side="bottom" className="flex-1 flex">
               <Stat icon={Compass} label={tr(UI.distance, lang)} value={String(state.distance ?? 0)} />
             </TouchTooltip>
-            <TouchTooltip content={tr(UI.tooltipInsight, lang)} side="bottom" className="relative flex-1 cursor-help">
+            <TouchTooltip content={tr(UI.tooltipInsight, lang)} side="bottom" className="flex-1 flex">
               <Stat icon={BookOpen} label={tr(UI.insight, lang)} value={String(state.insight ?? 0)} />
             </TouchTooltip>
           </div>
@@ -380,7 +380,7 @@ export default function Home() {
 
 function Stat({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
   return (
-    <div className="flex flex-col items-center gap-0.5 flex-1">
+    <div className="flex flex-col items-center gap-0.5 w-full">
       <Icon className="w-3.5 h-3.5 opacity-70" />
       <div className="text-[10px] opacity-60 uppercase tracking-wide">{label}</div>
       <div className="text-sm font-semibold">{value}</div>
