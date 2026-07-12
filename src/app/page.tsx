@@ -100,7 +100,7 @@ export default function Home() {
     }
   }, [state?.phase]);
 
-  // Narrate the current koan question when it appears (TTS reads what's in the question field)
+  // Narrate the current koan question when it appears (TTS reads ONLY the question text, no topic title)
   useEffect(() => {
     if (!state?.started || !settings.voiceEnabled) return;
     if (state.awaitingChoice === 'koan' && state.currentKoanId) {
@@ -113,18 +113,7 @@ export default function Home() {
         return () => clearTimeout(timer);
       }
     }
-    // When encounter appears, narrate its description
-    if (state.awaitingChoice === 'encounter' && state.currentEncounter) {
-      const enc = state.currentEncounter;
-      const descArr = ENCOUNTER_DESCRIPTIONS[enc][settings.lang];
-      const desc = descArr[state.day % descArr.length]!;
-      const name = tr(ENCOUNTER_NAMES[enc], settings.lang);
-      const timer = setTimeout(() => {
-        getTTS().speak(`${name}. ${desc}`, settings.lang, settings.voiceGender);
-      }, 800);
-      return () => clearTimeout(timer);
-    }
-  }, [state?.currentKoanId, state?.currentEncounter, state?.awaitingChoice, state?.started, state?.day, settings.voiceEnabled, settings.lang, settings.voiceGender]);
+  }, [state?.currentKoanId, state?.awaitingChoice, state?.started, settings.voiceEnabled, settings.lang, settings.voiceGender]);
 
   const lang = settings.lang;
 
@@ -166,16 +155,12 @@ export default function Home() {
       const responseText = tr(opt.response, lang);
       setDesertResponse(responseText);
 
-      // TTS narrate: player's chosen answer → desert's response
+      // TTS narrate ONLY the desert's response (player's answer is NOT narrated)
       if (settings.voiceEnabled) {
         const audio = getAudioEngine();
         audio.setPhase('night');
-        const answerText = tr(opt.text, lang);
-        // Queue: first the player's answer, then the desert's response
-        getTTS().speak(answerText, lang, settings.voiceGender, () => {
-          getTTS().speak(responseText, lang, settings.voiceGender, () => {
-            audio.setPhase(newState.phase);
-          });
+        getTTS().speak(responseText, lang, settings.voiceGender, () => {
+          audio.setPhase(newState.phase);
         });
       }
 
@@ -225,14 +210,11 @@ export default function Home() {
 
       // Show result
       const resultText = tr(choice.result, lang);
-      const choiceText = tr(choice.text, lang);
       setShowResponse({ text: resultText, insight: choice.insight });
 
-      // TTS narrate: player's chosen action → encounter result
+      // TTS narrate ONLY the encounter result (player's action is NOT narrated)
       if (settings.voiceEnabled) {
-        getTTS().speak(choiceText, lang, settings.voiceGender, () => {
-          getTTS().speak(resultText, lang, settings.voiceGender);
-        });
+        getTTS().speak(resultText, lang, settings.voiceGender);
       }
 
       // Haptics
@@ -449,7 +431,6 @@ function JourneyView({ state, lang, onKoanAnswer, onEncounterChoice, desertRespo
           <div className="flex items-center gap-2 mb-3">
             <EncounterIcon type={enc} />
             <h3 className="text-lg font-serif font-semibold flex-1">{name}</h3>
-            <NarrateButton text={`${name}. ${desc}`} lang={lang} tooltip={tr({ ru: 'Озвучить', en: 'Narrate' }, lang)} />
           </div>
           <p className="text-sm italic opacity-80 leading-relaxed">{desc}</p>
         </Card>
