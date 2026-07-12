@@ -6,7 +6,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { GameState, Settings, Lang, VoiceGender } from '../game/types';
+import type { GameState, Settings, Lang } from '../game/types';
 import { createInitialState, getKoanForDay } from '../game/engine';
 
 interface GameStore {
@@ -22,9 +22,6 @@ interface GameStore {
   toggleMusic: () => void;
   toggleVoice: () => void;
   toggleVibration: () => void;
-  setVoiceGender: (g: VoiceGender) => void;
-  /** Sync state from external source (e.g. Telegram bot session) */
-  hydrateFromBot: (state: GameState, lang: Lang) => void;
 }
 
 const defaultSettings: Settings = {
@@ -33,7 +30,6 @@ const defaultSettings: Settings = {
   musicEnabled: true,
   voiceEnabled: true,
   vibrationEnabled: true,
-  voiceGender: 'female',
 };
 
 export const useGameStore = create<GameStore>()(
@@ -71,28 +67,20 @@ export const useGameStore = create<GameStore>()(
       toggleVoice: () => set((s) => ({ settings: { ...s.settings, voiceEnabled: !s.settings.voiceEnabled } })),
       toggleVibration: () =>
         set((s) => ({ settings: { ...s.settings, vibrationEnabled: !s.settings.vibrationEnabled } })),
-      setVoiceGender: (g) => set((s) => ({ settings: { ...s.settings, voiceGender: g } })),
-
-      hydrateFromBot: (state, lang) =>
-        set((s) => ({ state, settings: { ...s.settings, lang } })),
     }),
     {
       name: 'desert-game-store',
-      version: 2,
-      // Migrate old persisted state to new schema (adds pending* fields, finished)
+      version: 3,
       migrate: (persisted: any, version: number) => {
         if (!persisted) return persisted;
-        // Ensure settings exist with all fields
         if (persisted.settings) {
-          persisted.settings = { ...defaultSettings, ...persisted.settings };
+          // v3: remove voiceGender from settings
+          const { voiceGender, ...rest } = persisted.settings;
+          persisted.settings = { ...defaultSettings, ...rest };
         }
-        // Migrate game state: if old version (1), reset state to force fresh start
-        // (old state lacks pendingKoanId/pendingAnswer/pendingResponse/finished)
         if (version < 2 && persisted.state) {
-          // Reset state to null — user starts fresh (old incompatible state)
           persisted.state = null;
         }
-        // Defensive: ensure all required fields exist on state
         if (persisted.state) {
           const s = persisted.state;
           s.pendingKoanId = s.pendingKoanId ?? null;

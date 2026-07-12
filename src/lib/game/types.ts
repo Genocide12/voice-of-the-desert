@@ -57,5 +57,12 @@ export interface Settings {
   musicEnabled: boolean;
   voiceEnabled: boolean;
   vibrationEnabled: boolean;
-  voiceGender: VoiceGender;
 }
+
+/**
+ * Voice assignment (fixed, not user-configurable):
+ * - Desert's response → female voice (Svetlana / Aria)
+ * - Koan question → male voice (Dmitry / Guy)
+ */
+export const DESERT_VOICE: VoiceGender = 'female';
+export const QUESTION_VOICE: VoiceGender = 'male';

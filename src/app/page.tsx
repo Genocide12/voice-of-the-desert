@@ -1,20 +1,18 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sun, Moon, Sunset, Sunrise, Volume2, VolumeX, Music, Music2, Smartphone, Vibrate, Globe, RotateCcw, Download, Map as MapIcon, BookOpen, Compass, Settings as SettingsIcon, Play } from 'lucide-react';
+import { Sun, Moon, Sunset, Sunrise, Volume2, VolumeX, Music, Music2, Vibrate, Globe, RotateCcw, Download, Map as MapIcon, BookOpen, Compass, Settings as SettingsIcon, Play } from 'lucide-react';
 import { useGameStore } from '@/lib/store/gameStore';
-import { useGameStore as _useGameStore } from '@/lib/store/gameStore';
-import { detectLang, type Lang, type Localized } from '@/lib/i18n';
+import { detectLang, type Lang } from '@/lib/i18n';
 import { UI, KOANS, ENCOUNTER_NAMES, ENCOUNTER_DESCRIPTIONS, DESERT_GREETINGS, tr } from '@/lib/i18n/content';
 import {
   getCurrentKoan,
   getCurrentEncounterChoices,
   resolveKoanAnswer,
   resolveEncounterChoice,
-  createInitialState,
-  getKoanForDay,
 } from '@/lib/game/engine';
+import { DESERT_VOICE, QUESTION_VOICE } from '@/lib/game/types';
 import { getAudioEngine } from '@/lib/audio/AudioEngine';
 import { getTTS } from '@/lib/audio/ttsService';
 import { getHaptics } from '@/lib/haptics';
@@ -29,12 +27,11 @@ type Tab = 'journey' | 'map' | 'journal' | 'settings';
 const PHASE_ICONS = { day: Sun, dusk: Sunset, night: Moon, dawn: Sunrise };
 
 export default function Home() {
-  const { state, settings, startGame, newGame, setKoanAnswered, setEncounterResolved, setLang, toggleSound, toggleMusic, toggleVoice, toggleVibration, setVoiceGender } = useGameStore();
+  const { state, settings, startGame, newGame, setKoanAnswered, setEncounterResolved, setLang, toggleSound, toggleMusic, toggleVoice, toggleVibration } = useGameStore();
   const [tab, setTab] = useState<Tab>('journey');
   const [installEvent, setInstallEvent] = useState<any>(null);
   const [showResponse, setShowResponse] = useState<{ text: string; insight: number } | null>(null);
   const [desertResponse, setDesertResponse] = useState<string | null>(null);
-  const [pendingAnswerIdx, setPendingAnswerIdx] = useState<number | null>(null);
 
   // Init: detect language, set up audio, Telegram
   useEffect(() => {
@@ -66,7 +63,7 @@ export default function Home() {
     };
     window.addEventListener('beforeinstallprompt', handler);
     return () => window.removeEventListener('beforeinstallprompt', handler);
-  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Apply settings changes to engines
   useEffect(() => {
@@ -100,50 +97,45 @@ export default function Home() {
     }
   }, [state?.phase]);
 
-  // Auto-narrate ALL blocks on the Path page when they appear.
-  // - Koan page: greeting + koan question
-  // - Encounter page: encounter name + description
+  // Auto-narrate on Path page:
+  // - Koan page: narrate ONLY the question (male voice)
+  // - Encounter page: narrate ONLY the desert's response (female voice)
+  // - Finale: narrate finale body (female voice — the desert speaks)
   // Stops immediately when player answers (new page appears).
   useEffect(() => {
     if (!state?.started || !settings.voiceEnabled) return;
-    const lang = settings.lang === 'en' ? 'en' : 'ru';
+    const lang: Lang = settings.lang === 'en' ? 'en' : 'ru';
 
-    // KOAN page: narrate greeting + question
+    // KOAN page: narrate question (male voice)
     if (state.awaitingChoice === 'koan' && state.currentKoanId) {
       const koan = KOANS.find((k) => k.id === state.currentKoanId);
       if (koan) {
         getTTS().stop();
-        const greeting = DESERT_GREETINGS[lang][state.day % DESERT_GREETINGS[lang].length] ?? '';
         const question = tr(koan.question, lang);
-        const fullText = greeting ? `${greeting} ${question}` : question;
         const timer = setTimeout(() => {
-          getTTS().speak(fullText, lang, settings.voiceGender);
+          getTTS().speak(question, lang, QUESTION_VOICE);
         }, 400);
         return () => clearTimeout(timer);
       }
     }
 
-    // ENCOUNTER page: narrate encounter name + description
+    // ENCOUNTER page: narrate ONLY the desert's response (female voice)
     if (state.awaitingChoice === 'encounter' && state.currentEncounter) {
-      const enc = state.currentEncounter;
-      const name = tr(ENCOUNTER_NAMES[enc], lang);
-      const descArr = ENCOUNTER_DESCRIPTIONS[enc][lang];
-      const desc = descArr?.[state.day % descArr.length] ?? '';
-      const answer = state.pendingAnswer;
       const response = state.pendingResponse;
-      getTTS().stop();
-      const fullText = `${name}. ${desc}${answer ? `. ${tr(UI.youAnswered, lang)}: ${answer}` : ''}${response ? `. ${tr(UI.desertSpeaks, lang)}: ${response}` : ''}`;
-      const timer = setTimeout(() => {
-        getTTS().speak(fullText, lang, settings.voiceGender);
-      }, 400);
-      return () => clearTimeout(timer);
+      if (response) {
+        getTTS().stop();
+        const timer = setTimeout(() => {
+          getTTS().speak(response, lang, DESERT_VOICE);
+        }, 400);
+        return () => clearTimeout(timer);
+      }
     }
 
-    // FINALE page: narrate finale
+    // FINALE page: narrate finale (female voice — the desert speaks)
     if (state.awaitingChoice === 'finale') {
       getTTS().stop();
       const timer = setTimeout(() => {
-        getTTS().speak(`${tr(UI.finaleTitle, lang)}. ${tr(UI.finaleBody, lang)}`, lang, settings.voiceGender);
+        getTTS().speak(`${tr(UI.finaleTitle, lang)}. ${tr(UI.finaleBody, lang)}`, lang, DESERT_VOICE);
       }, 500);
       return () => clearTimeout(timer);
     }
@@ -152,7 +144,7 @@ export default function Home() {
     if (!state.awaitingChoice) {
       getTTS().stop();
     }
-  }, [state?.currentKoanId, state?.currentEncounter, state?.awaitingChoice, state?.started, state?.day, state?.pendingAnswer, state?.pendingResponse, settings.voiceEnabled, settings.lang, settings.voiceGender]);
+  }, [state?.currentKoanId, state?.currentEncounter, state?.awaitingChoice, state?.started, state?.pendingResponse, settings.voiceEnabled, settings.lang]);
 
   const lang: Lang = settings.lang === 'en' ? 'en' : 'ru';
 
@@ -176,7 +168,6 @@ export default function Home() {
     newGame();
     setShowResponse(null);
     setDesertResponse(null);
-    setPendingAnswerIdx(null);
   }, [handleButtonClick, newGame, lang]);
 
   // Koan answer — STOP question narration immediately, then show encounter
@@ -192,7 +183,6 @@ export default function Home() {
       if (!opt) return;
       const { state: newState } = resolveKoanAnswer(state, koan, idx, lang);
       setKoanAnswered(newState);
-      setPendingAnswerIdx(idx);
 
       // Show desert response (visual only — NO TTS narration of response)
       const responseText = tr(opt.response, lang);
@@ -369,7 +359,6 @@ export default function Home() {
                   onToggleMusic={toggleMusic}
                   onToggleVoice={toggleVoice}
                   onToggleVibration={toggleVibration}
-                  onSetVoiceGender={setVoiceGender}
                   onSetLang={setLang}
                   onButtonClick={handleButtonClick}
                   onNewGame={handleNewGame}
@@ -703,14 +692,13 @@ function JournalView({ state, lang }: { state: ReturnType<typeof useGameStore>['
   );
 }
 
-function SettingsView({ settings, lang, onToggleSound, onToggleMusic, onToggleVoice, onToggleVibration, onSetVoiceGender, onSetLang, onButtonClick, onNewGame }: {
+function SettingsView({ settings, lang, onToggleSound, onToggleMusic, onToggleVoice, onToggleVibration, onSetLang, onButtonClick, onNewGame }: {
   settings: ReturnType<typeof useGameStore>['settings'];
   lang: Lang;
   onToggleSound: () => void;
   onToggleMusic: () => void;
   onToggleVoice: () => void;
   onToggleVibration: () => void;
-  onSetVoiceGender: (g: 'female' | 'male') => void;
   onSetLang: (l: Lang) => void;
   onButtonClick: () => void;
   onNewGame: () => void;
@@ -739,26 +727,6 @@ function SettingsView({ settings, lang, onToggleSound, onToggleMusic, onToggleVo
         <SettingRow icon={Music2} iconOff={Music} label={tr(UI.music, lang)} tooltip={tr(UI.tooltipMusic, lang)} enabled={settings.musicEnabled} onToggle={onToggleMusic} onClick={onButtonClick} />
         <SettingRow icon={Volume2} iconOff={VolumeX} label={tr(UI.voice, lang)} tooltip={tr(UI.tooltipVoice, lang)} enabled={settings.voiceEnabled} onToggle={onToggleVoice} onClick={onButtonClick} />
         <SettingRow icon={Vibrate} iconOff={Vibrate} label={tr(UI.vibration, lang)} tooltip={tr(UI.tooltipVibration, lang)} enabled={settings.vibrationEnabled} onToggle={onToggleVibration} onClick={onButtonClick} />
-
-        {/* Voice gender */}
-        {settings.voiceEnabled && (
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Smartphone className="w-4 h-4 opacity-70" />
-                <span className="text-sm">{tr(UI.voiceGender, lang)}</span>
-              </div>
-              <div className="flex gap-1">
-                <Button size="sm" variant={settings.voiceGender === 'female' ? 'default' : 'outline'} onClick={() => { onButtonClick(); onSetVoiceGender('female'); }}>
-                  {tr(UI.voiceFemale, lang)}
-                </Button>
-                <Button size="sm" variant={settings.voiceGender === 'male' ? 'default' : 'outline'} onClick={() => { onButtonClick(); onSetVoiceGender('male'); }}>
-                  {tr(UI.voiceMale, lang)}
-                </Button>
-              </div>
-            </div>
-          </Card>
-        )}
 
         {/* New game */}
         <Card className="p-4 border-destructive/30">
