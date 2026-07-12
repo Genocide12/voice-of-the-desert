@@ -339,13 +339,20 @@ export async function POST(req: NextRequest) {
 
         if (isAnswer) {
           // Koan answer
-          const koan = KOANS.find((k) => k.id === state.currentKoanId);
-          if (!koan || !koan.options[idx]) {
-            await sendMessage(chatId, 'Invalid option. Type /new to start over.', mainMenuKeyboard(lang));
-            return NextResponse.json({ ok: true });
+          try {
+            const koan = KOANS.find((k) => k.id === state.currentKoanId);
+            if (!koan || !koan.options[idx]) {
+              await sendMessage(chatId, 'Invalid option. Type /new to start over.', mainMenuKeyboard(lang));
+              return NextResponse.json({ ok: true });
+            }
+            const { state: newState } = resolveKoanAnswer(state, koan, idx, lang);
+            const msg = buildEncounterMessage(newState, lang);
+            const kb = encounterKeyboard(newState.currentEncounter!, newState, lang);
+            await sendMessage(chatId, msg, kb);
+          } catch (innerE) {
+            console.error('ans_ error:', innerE);
+            await sendMessage(chatId, 'Error: ' + (innerE instanceof Error ? innerE.message : 'unknown'), mainMenuKeyboard(lang));
           }
-          const { state: newState } = resolveKoanAnswer(state, koan, idx, lang);
-          await sendMessage(chatId, buildEncounterMessage(newState, lang), encounterKeyboard(newState.currentEncounter!, newState, lang));
         } else {
           // Encounter choice
           const enc = state.currentEncounter;
