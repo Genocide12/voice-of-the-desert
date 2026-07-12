@@ -1,18 +1,21 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type CSSProperties } from 'react';
 
 interface TouchTooltipProps {
   content: ReactNode;
   children: ReactNode;
   side?: 'top' | 'bottom' | 'left' | 'right';
+  /** Allow parent to pass className for proper sizing */
+  className?: string;
 }
 
 /**
- * Tooltip that works on both desktop (hover) and mobile (long-press).
- * On touch devices, press-and-hold for 500ms reveals the tooltip.
+ * Tooltip that works on both desktop (hover) and mobile (long-press 400ms).
+ * On touch devices, press-and-hold reveals the tooltip.
+ * Prevents iOS Safari native callout/context menu.
  */
-export function TouchTooltip({ content, children, side = 'top' }: TouchTooltipProps) {
+export function TouchTooltip({ content, children, side = 'top', className }: TouchTooltipProps) {
   const [visible, setVisible] = useState(false);
   const [coords, setCoords] = useState<{ x: number; y: number } | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -34,16 +37,23 @@ export function TouchTooltip({ content, children, side = 'top' }: TouchTooltipPr
   const handleMouseEnter = () => show();
   const handleMouseLeave = () => hide();
 
-  // Mobile long-press
+  // Mobile long-press — 400ms threshold
   const handleTouchStart = (e: React.TouchEvent) => {
     longPressed.current = false;
     const touch = e.touches[0];
+    if (!touch) return;
+    const clientX = touch.clientX;
+    const clientY = touch.clientY;
     pressTimer.current = setTimeout(() => {
       longPressed.current = true;
-      show(touch.clientX, touch.clientY);
-      // Prevent context menu on long press
-      if (navigator.vibrate) navigator.vibrate(10);
-    }, 500);
+      show(clientX, clientY);
+      // Audio haptic feedback (works on Safari iOS)
+      try {
+        if (navigator.vibrate) navigator.vibrate(10);
+      } catch {
+        /* ignore */
+      }
+    }, 400);
   };
 
   const handleTouchEnd = () => {
@@ -51,9 +61,9 @@ export function TouchTooltip({ content, children, side = 'top' }: TouchTooltipPr
       clearTimeout(pressTimer.current);
       pressTimer.current = null;
     }
-    // Hide tooltip shortly after release if it was long-pressed
     if (longPressed.current) {
-      setTimeout(() => hide(), 1500);
+      // Keep tooltip visible for 2 seconds after release
+      setTimeout(() => hide(), 2000);
     }
   };
 
@@ -65,18 +75,23 @@ export function TouchTooltip({ content, children, side = 'top' }: TouchTooltipPr
     hide();
   };
 
-  // Prevent native context menu on long-press
+  // Prevent native context menu / iOS callout on long-press
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
     const prevent = (e: Event) => {
       if (longPressed.current) e.preventDefault();
     };
+    // iOS Safari callout prevention
+    const preventCallout = (e: Event) => e.preventDefault();
     el.addEventListener('contextmenu', prevent);
-    return () => el.removeEventListener('contextmenu', prevent);
+    el.addEventListener('selectstart', preventCallout);
+    return () => {
+      el.removeEventListener('contextmenu', prevent);
+      el.removeEventListener('selectstart', preventCallout);
+    };
   }, []);
 
-  // Position the tooltip
   const sideClass =
     side === 'top'
       ? 'bottom-full left-1/2 -translate-x-1/2 mb-2'
@@ -86,10 +101,19 @@ export function TouchTooltip({ content, children, side = 'top' }: TouchTooltipPr
           ? 'right-full top-1/2 -translate-y-1/2 mr-2'
           : 'left-full top-1/2 -translate-y-1/2 ml-2';
 
+  // Style: prevent iOS native behaviors that steal long-press
+  const wrapperStyle: CSSProperties = {
+    WebkitTouchCallout: 'none',
+    WebkitUserSelect: 'none',
+    userSelect: 'none',
+    touchAction: 'manipulation',
+  };
+
   return (
     <div
       ref={wrapRef}
-      className="relative inline-flex"
+      className={className ?? 'relative inline-flex'}
+      style={wrapperStyle}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onTouchStart={handleTouchStart}

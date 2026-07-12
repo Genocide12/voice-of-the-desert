@@ -98,30 +98,42 @@ function getAudioCtx(): AudioContext | null {
   return _audioCtx;
 }
 
+// Global: initialize AudioContext on first touch/click (Safari iOS requirement)
+if (typeof window !== 'undefined') {
+  const initOnGesture = () => {
+    getAudioCtx();
+  };
+  window.addEventListener('touchstart', initOnGesture, { once: true, passive: true });
+  window.addEventListener('click', initOnGesture, { once: true, passive: true });
+}
+
 /**
  * Play a synthesized "haptic buzz" — a short burst that mimics physical vibration.
  * This is the KEY fallback for Safari iOS where navigator.vibrate is unavailable.
  *
  * Technique: low-frequency sine wave + filtered noise burst = "thump" felt through speaker.
- * Different intensities produce different perceptible feedback:
- * - soft: 80Hz sine, 40ms (subtle tick)
- * - medium: 60Hz sine + noise, 60ms (clear tap)
- * - strong: 45Hz sine + noise + harmonic, 90ms (deep thump)
+ * Connects DIRECTLY to destination (not through masterGain) to ensure audible even if
+ * masterGain is at 0.
  */
 function playAudioHaptic(intensity: 'soft' | 'medium' | 'strong') {
   const ctx = getAudioCtx();
-  if (!ctx || !_masterGain) return;
+  if (!ctx) return;
   const now = ctx.currentTime;
 
-  // Resume context if suspended (Safari iOS requirement)
+  // Resume context if suspended (Safari iOS requirement — MUST be in user gesture)
   if (ctx.state === 'suspended') {
     ctx.resume().catch(() => {});
   }
 
+  // Create a dedicated gain node for haptics (independent of masterGain)
+  const hapticGain = ctx.createGain();
+  hapticGain.gain.value = 0.6;
+  hapticGain.connect(ctx.destination);
+
   const settings = {
-    soft: { freq: 80, duration: 0.04, vol: 0.15, noise: false },
-    medium: { freq: 60, duration: 0.06, vol: 0.25, noise: true },
-    strong: { freq: 45, duration: 0.09, vol: 0.4, noise: true },
+    soft: { freq: 100, duration: 0.05, vol: 0.3, noise: false },
+    medium: { freq: 70, duration: 0.08, vol: 0.5, noise: true },
+    strong: { freq: 50, duration: 0.12, vol: 0.7, noise: true },
   }[intensity];
 
   // 1. Low-frequency sine wave (the "thump")
@@ -129,36 +141,35 @@ function playAudioHaptic(intensity: 'soft' | 'medium' | 'strong') {
   const oscGain = ctx.createGain();
   osc.type = 'sine';
   osc.frequency.setValueAtTime(settings.freq, now);
-  // Slight frequency drop for "thump" character
-  osc.frequency.exponentialRampToValueAtTime(settings.freq * 0.7, now + settings.duration);
+  osc.frequency.exponentialRampToValueAtTime(Math.max(20, settings.freq * 0.5), now + settings.duration);
   oscGain.gain.setValueAtTime(0.0001, now);
   oscGain.gain.exponentialRampToValueAtTime(settings.vol, now + 0.005);
   oscGain.gain.exponentialRampToValueAtTime(0.0001, now + settings.duration);
   osc.connect(oscGain);
-  oscGain.connect(_masterGain);
+  oscGain.connect(hapticGain);
   osc.start(now);
   osc.stop(now + settings.duration + 0.01);
 
   // 2. Filtered noise burst (the "buzz" texture)
   if (settings.noise) {
-    const noiseDuration = settings.duration * 0.8;
+    const noiseDuration = settings.duration * 0.9;
     const bufferSize = Math.floor(ctx.sampleRate * noiseDuration);
     const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize); // fade out
+      data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
     }
     const noiseSrc = ctx.createBufferSource();
     noiseSrc.buffer = buffer;
     const noiseFilter = ctx.createBiquadFilter();
     noiseFilter.type = 'lowpass';
-    noiseFilter.frequency.value = settings.freq * 3; // keep only low freqs
-    noiseFilter.Q.value = 5;
+    noiseFilter.frequency.value = settings.freq * 4;
+    noiseFilter.Q.value = 3;
     const noiseGain = ctx.createGain();
-    noiseGain.gain.value = settings.vol * 0.5;
+    noiseGain.gain.value = settings.vol * 0.4;
     noiseSrc.connect(noiseFilter);
     noiseFilter.connect(noiseGain);
-    noiseGain.connect(_masterGain);
+    noiseGain.connect(hapticGain);
     noiseSrc.start(now);
     noiseSrc.stop(now + noiseDuration);
   }
@@ -167,16 +178,21 @@ function playAudioHaptic(intensity: 'soft' | 'medium' | 'strong') {
   if (intensity === 'strong') {
     const osc2 = ctx.createOscillator();
     const osc2Gain = ctx.createGain();
-    osc2.type = 'sine';
-    osc2.frequency.value = settings.freq * 1.5; // fifth
+    osc2.type = 'triangle';
+    osc2.frequency.value = settings.freq * 1.5;
     osc2Gain.gain.setValueAtTime(0.0001, now);
-    osc2Gain.gain.exponentialRampToValueAtTime(settings.vol * 0.3, now + 0.008);
+    osc2Gain.gain.exponentialRampToValueAtTime(settings.vol * 0.4, now + 0.008);
     osc2Gain.gain.exponentialRampToValueAtTime(0.0001, now + settings.duration);
     osc2.connect(osc2Gain);
-    osc2Gain.connect(_masterGain);
+    osc2Gain.connect(hapticGain);
     osc2.start(now);
     osc2.stop(now + settings.duration + 0.01);
   }
+
+  // Cleanup hapticGain after use
+  setTimeout(() => {
+    try { hapticGain.disconnect(); } catch { /* ignore */ }
+  }, (settings.duration + 0.1) * 1000);
 }
 
 class HapticsService {

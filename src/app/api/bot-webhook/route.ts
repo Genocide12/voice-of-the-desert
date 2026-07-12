@@ -129,6 +129,17 @@ async function answerCallback(callbackId: string) {
   return tg('answerCallbackQuery', { callback_query_id: callbackId });
 }
 
+/** Edit the message that contained the inline button (instead of sending a new message) */
+async function editMessage(chatId: number, messageId: number, text: string, replyMarkup?: any, parseMode = 'Markdown') {
+  return tg('editMessageText', {
+    chat_id: chatId,
+    message_id: messageId,
+    text,
+    parse_mode: parseMode,
+    reply_markup: replyMarkup,
+  });
+}
+
 function tr(loc: Localized, lang: Lang): string {
   return loc[lang] ?? loc.ru;
 }
@@ -290,91 +301,89 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // Handle callback query
+    // Handle callback query — EDIT the original message (no new messages)
     if (update.callback_query) {
       const cb = update.callback_query;
       const chatId = cb.message?.chat?.id;
+      const messageId = cb.message?.message_id;
       const data = cb.data ?? '';
-      if (!chatId) {
+      if (!chatId || !messageId) {
         await answerCallback(cb.id);
         return NextResponse.json({ ok: true });
       }
       await answerCallback(cb.id);
 
-      // Parse callback data
-      // Format options:
-      //   menu, help, lang_menu, lang_ru, lang_en, new
-      //   a{idx}_s{state}  — koan answer
-      //   e{idx}_s{state}  — encounter choice
+      // Helper: edit current message in-place
+      const edit = (text: string, kb?: any) => editMessage(chatId, messageId, text, kb);
 
+      // Parse callback data
       if (data === 'menu') {
-        // Detect lang from callback user
         const lang: Lang = (cb.from?.language_code?.startsWith('en') ? 'en' : 'ru') as Lang;
-        await sendMessage(chatId, tr(BOT.welcome, lang), mainMenuKeyboard(lang));
+        await edit(tr(BOT.welcome, lang), mainMenuKeyboard(lang));
       } else if (data === 'help') {
         const lang: Lang = (cb.from?.language_code?.startsWith('en') ? 'en' : 'ru') as Lang;
-        await sendMessage(chatId, tr(BOT.help, lang), mainMenuKeyboard(lang));
+        await edit(tr(BOT.help, lang), mainMenuKeyboard(lang));
       } else if (data === 'lang_menu') {
-        await sendMessage(chatId, tr(BOT.langPrompt, 'ru'), langKeyboard());
+        await edit(tr(BOT.langPrompt, 'ru'), langKeyboard());
       } else if (data === 'lang_ru' || data === 'lang_en') {
         const lang: Lang = data === 'lang_ru' ? 'ru' : 'en';
-        await sendMessage(chatId, tr(BOT.langChanged, lang), mainMenuKeyboard(lang));
+        await edit(tr(BOT.langChanged, lang), mainMenuKeyboard(lang));
       } else if (data === 'new') {
         const lang: Lang = (cb.from?.language_code?.startsWith('en') ? 'en' : 'ru') as Lang;
         const firstKoan = getKoanForDay(1);
         const state = createInitialState(firstKoan.id);
-        await sendMessage(chatId, tr(BOT.newGameStarted, lang) + '\n\n' + buildKoanMessage(state, lang), koanKeyboard(state.currentKoanId!, state, lang));
+        await edit(tr(BOT.newGameStarted, lang) + '\n\n' + buildKoanMessage(state, lang), koanKeyboard(state.currentKoanId!, state, lang));
       } else if (data.startsWith('a') || data.startsWith('e')) {
         // Parse action + state
         const isAnswer = data.startsWith('a');
-        const rest = data.slice(1); // remove 'a' or 'e'
+        const rest = data.slice(1);
         const stateStart = rest.indexOf('_s');
         if (stateStart === -1) {
-          await sendMessage(chatId, 'Session expired. Type /new to start over.', mainMenuKeyboard('ru'));
+          await edit('Session expired. Type /new to start over.', mainMenuKeyboard('ru'));
           return NextResponse.json({ ok: true });
         }
         const idx = parseInt(rest.slice(0, stateStart), 10);
-        const stateEnc = rest.slice(stateStart + 1); // includes 's' prefix
+        const stateEnc = rest.slice(stateStart + 1);
         const decoded = decodeState(stateEnc);
         if (!decoded) {
-          await sendMessage(chatId, 'Session expired. Type /new to start over.', mainMenuKeyboard('ru'));
+          await edit('Session expired. Type /new to start over.', mainMenuKeyboard('ru'));
           return NextResponse.json({ ok: true });
         }
         const { state, lang } = decoded;
 
         if (isAnswer) {
-          // Koan answer
+          // Koan answer → edit to encounter message
           try {
             const koan = KOANS.find((k) => k.id === state.currentKoanId);
             if (!koan || !koan.options[idx]) {
-              await sendMessage(chatId, 'Invalid option. Type /new to start over.', mainMenuKeyboard(lang));
+              await edit('Invalid option. Type /new to start over.', mainMenuKeyboard(lang));
               return NextResponse.json({ ok: true });
             }
             const { state: newState } = resolveKoanAnswer(state, koan, idx, lang);
             const msg = buildEncounterMessage(newState, lang);
             const kb = encounterKeyboard(newState.currentEncounter!, newState, lang);
-            await sendMessage(chatId, msg, kb);
+            await edit(msg, kb);
           } catch (innerE) {
             console.error('ans_ error:', innerE, 'data:', data);
-            await sendMessage(chatId, 'Error: ' + (innerE instanceof Error ? innerE.message : 'unknown'), mainMenuKeyboard(lang));
+            await edit('Error: ' + (innerE instanceof Error ? innerE.message : 'unknown'), mainMenuKeyboard(lang));
           }
         } else {
-          // Encounter choice
+          // Encounter choice → edit to next koan (or finale)
           const enc = state.currentEncounter;
           if (!enc) {
-            await sendMessage(chatId, 'Invalid encounter. Type /new to start over.', mainMenuKeyboard(lang));
+            await edit('Invalid encounter. Type /new to start over.', mainMenuKeyboard(lang));
             return NextResponse.json({ ok: true });
           }
           const { state: newState, isFinale } = resolveEncounterChoice(state, enc, idx, lang);
           if (isFinale) {
-            await sendMessage(chatId, buildFinaleMessage(newState, lang), mainMenuKeyboard(lang));
+            await edit(buildFinaleMessage(newState, lang), mainMenuKeyboard(lang));
           } else {
-            await sendMessage(chatId, buildStatsMessage(newState, lang) + '\n\n' + buildKoanMessage(newState, lang), koanKeyboard(newState.currentKoanId!, newState, lang));
+            await edit(buildStatsMessage(newState, lang) + '\n\n' + buildKoanMessage(newState, lang), koanKeyboard(newState.currentKoanId!, newState, lang));
           }
         }
       } else {
         const lang: Lang = (cb.from?.language_code?.startsWith('en') ? 'en' : 'ru') as Lang;
-        await sendMessage(chatId, tr(BOT.welcome, lang), mainMenuKeyboard(lang));
+        await edit(tr(BOT.welcome, lang), mainMenuKeyboard(lang));
       }
       return NextResponse.json({ ok: true });
     }
