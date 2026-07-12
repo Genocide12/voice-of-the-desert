@@ -1040,6 +1040,22 @@ export const BOT = {
     ru: 'Ты ещё не начал странствие. Нажми «Играть».',
     en: 'You have not started a journey yet. Tap "Play".',
   },
+  finaleTitle: { ru: 'Конец пути', en: 'End of the Path' },
+  finaleBody: {
+    ru: 'Пустыня замолкает. Ты оборачиваешься — и видишь, что следов нет. Ветер стёр их. Но что-то осталось. Что-то, что нельзя унести и нельзя потерять. Ты больше не странник. Ты — сама пустыня.',
+    en: 'The desert falls silent. You turn around — and see no footprints. The wind has erased them. But something remains. Something that cannot be carried and cannot be lost. You are no longer a wanderer. You are the desert itself.',
+  },
+  finaleStats: { ru: 'Твоё странствие', en: 'Your journey' },
+  playAgain: { ru: 'Начать заново', en: 'Begin again' },
+  // Tooltips
+  tooltipDay: { ru: 'Сколько дней в пути', en: 'How many days on the path' },
+  tooltipDistance: { ru: 'Сколько шагов пройдено', en: 'Steps taken' },
+  tooltipInsight: { ru: 'Прозрение — мера понимания. Растёт от правильных ответов', en: 'Insight — measure of understanding. Grows from wise answers' },
+  tooltipPhase: { ru: 'Время суток. Меняется с каждым шагом', en: 'Time of day. Shifts with each step' },
+  tooltipNarrate: { ru: 'Нажми, чтобы пустыня повторила вопрос', en: 'Tap for the desert to repeat the question' },
+  tooltipAnswer: { ru: 'Выбери ответ. У каждого — свои последствия', en: 'Choose your answer. Each has its consequences' },
+  tooltipEncounter: { ru: 'Встреча на пути. Реши, что делать', en: 'An encounter on the path. Decide what to do' },
+  tooltipEncounterChoice: { ru: 'Действие определяет, что будет дальше', en: 'Your action shapes what comes next' },
 } as const;
 
 export function tr(loc: Localized, lang: 'ru' | 'en'): string {

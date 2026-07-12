@@ -6,6 +6,9 @@
 import { KOANS, ENCOUNTER_CHOICES, type Koan, type EncounterType, type EncounterChoice } from '../i18n/content';
 import type { GameState, JournalEntry, PathNode, Phase, Lang } from './types';
 
+/** Total number of koans = max days. After this, the game reaches finale. */
+export const MAX_DAYS = KOANS.length;
+
 /** Pick a koan deterministically by day, rotating through the pool */
 export function getKoanForDay(day: number): Koan {
   if (KOANS.length === 0) throw new Error('No koans available');
@@ -19,7 +22,7 @@ export function getRandomKoan(seed?: number): Koan {
   return KOANS[s % KOANS.length]!;
 }
 
-/** Resolve a koan answer: returns new state + the chosen option's effects */
+/** Resolve a koan answer: saves pending answer/response, transitions to encounter */
 export function resolveKoanAnswer(
   state: GameState,
   koan: Koan,
@@ -35,7 +38,7 @@ export function resolveKoanAnswer(
 
   const encounter = option.nextEncounter;
 
-  // Path map node: add a new node based on direction
+  // Path map node
   const lastNode = state.path[state.path.length - 1];
   const lastX = lastNode?.x ?? 0;
   const lastY = lastNode?.y ?? 0;
@@ -49,7 +52,6 @@ export function resolveKoanAnswer(
     day: state.day,
   };
 
-  // Phase progression: day → dusk → night → dawn → day
   const nextPhase = progressPhase(state.phase);
 
   const newState: GameState = {
@@ -60,54 +62,84 @@ export function resolveKoanAnswer(
     insight: state.insight + option.insight,
     path: [...state.path, newNode],
     phase: nextPhase,
+    // SAVE pending data so resolveEncounterChoice can build a full journal entry
+    pendingKoanId: koan.id,
+    pendingAnswer: option.text[lang],
+    pendingResponse: option.response[lang],
   };
 
   return { state: newState, option, encounter };
 }
 
-/** Resolve an encounter choice */
+/** Resolve an encounter choice: builds journal entry from pending data, advances day */
 export function resolveEncounterChoice(
   state: GameState,
   encounter: EncounterType,
   choiceIndex: number,
-  koan: Koan | null,
-  answerText: string,
-  desertResponse: string,
   lang: Lang,
-): { state: GameState; choice: EncounterChoice; journalEntry: JournalEntry } {
+): { state: GameState; choice: EncounterChoice; journalEntry: JournalEntry; isFinale: boolean } {
   const choices = ENCOUNTER_CHOICES[encounter];
   const choice = choices?.[choiceIndex];
   if (!choice) throw new Error('Invalid encounter choice');
+
+  // Find the koan from pendingKoanId (not from journal[0]!)
+  const koan = state.pendingKoanId ? KOANS.find((k) => k.id === state.pendingKoanId) ?? null : null;
 
   const journalEntry: JournalEntry = {
     id: `j-${state.day}-${Date.now()}`,
     day: state.day,
     phase: state.phase,
-    koanId: koan?.id ?? 'unknown',
+    koanId: koan?.id ?? state.pendingKoanId ?? 'unknown',
     koanQuestion: koan?.question[lang] ?? '',
-    answerText,
-    desertResponse,
+    answerText: state.pendingAnswer,
+    desertResponse: state.pendingResponse,
     encounter,
     encounterResult: choice.result[lang],
     insightDelta: choice.insight,
     timestamp: Date.now(),
   };
 
-  const nextKoan = getKoanForDay(state.day + 1);
+  const nextDay = state.day + 1;
+  const isFinale = nextDay > MAX_DAYS;
 
+  if (isFinale) {
+    // Game finished — go to finale
+    const newState: GameState = {
+      ...state,
+      day: nextDay,
+      distance: Math.max(0, state.distance + choice.distance),
+      insight: state.insight + choice.insight,
+      phase: choice.nextPhase,
+      currentKoanId: null,
+      currentEncounter: null,
+      awaitingChoice: 'finale',
+      pendingKoanId: null,
+      pendingAnswer: '',
+      pendingResponse: '',
+      journal: [journalEntry, ...state.journal].slice(0, 100),
+      finished: true,
+    };
+    return { state: newState, choice, journalEntry, isFinale: true };
+  }
+
+  const nextKoan = getKoanForDay(nextDay);
   const newState: GameState = {
     ...state,
-    day: state.day + 1,
+    day: nextDay,
     distance: Math.max(0, state.distance + choice.distance),
     insight: state.insight + choice.insight,
     phase: choice.nextPhase,
     currentKoanId: nextKoan.id,
     currentEncounter: null,
     awaitingChoice: 'koan',
-    journal: [journalEntry, ...state.journal].slice(0, 100), // keep last 100
+    // Clear pending data
+    pendingKoanId: null,
+    pendingAnswer: '',
+    pendingResponse: '',
+    journal: [journalEntry, ...state.journal].slice(0, 100),
   };
 
-  return { state: newState, choice, journalEntry };
+  return { state: newState, choice, journalEntry, isFinale: false };
 }
 
 /** Progress phase: day → dusk → night → dawn → day */
@@ -128,6 +160,9 @@ export function createInitialState(firstKoanId: string): GameState {
     currentKoanId: firstKoanId,
     currentEncounter: null,
     awaitingChoice: 'koan',
+    pendingKoanId: null,
+    pendingAnswer: '',
+    pendingResponse: '',
     path: [
       {
         x: 0,
@@ -138,6 +173,7 @@ export function createInitialState(firstKoanId: string): GameState {
       },
     ],
     journal: [],
+    finished: false,
   };
 }
 

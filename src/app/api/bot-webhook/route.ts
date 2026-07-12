@@ -161,12 +161,15 @@ function buildKoanMessage(state: GameState, lang: Lang): string {
   ].join('\n');
 }
 
-function buildEncounterMessage(state: GameState, lang: Lang, answerText: string, desertResponse: string): string {
+function buildEncounterMessage(state: GameState, lang: Lang): string {
   const enc = state.currentEncounter;
   if (!enc) return tr(BOT.emptyJourney, lang);
   const name = tr(ENCOUNTER_NAMES[enc], lang);
   const descArr = ENCOUNTER_DESCRIPTIONS[enc][lang];
   const desc = descArr[state.day % descArr.length]!;
+  // Use pendingAnswer/pendingResponse from state (saved by resolveKoanAnswer)
+  const answerText = state.pendingAnswer || '…';
+  const desertResponse = state.pendingResponse || '…';
   return [
     `*${name}*`,
     '',
@@ -187,6 +190,21 @@ function buildStatsMessage(state: GameState, lang: Lang): string {
     `${tr({ ru: 'День', en: 'Day' }, lang)}: ${state.day}`,
     `${tr({ ru: 'Путь', en: 'Distance' }, lang)}: ${state.distance}`,
     `${tr({ ru: 'Прозрение', en: 'Insight' }, lang)}: ${state.insight}`,
+  ].join('\n');
+}
+
+function buildFinaleMessage(state: GameState, lang: Lang): string {
+  return [
+    `🌅 *${tr({ ru: 'Конец пути', en: 'End of the Path' }, lang)}*`,
+    '',
+    `_${tr({ ru: 'Пустыня замолкает. Ты оборачиваешься — и видишь, что следов нет. Ветер стёр их. Но что-то осталось. Ты больше не странник. Ты — сама пустыня.', en: 'The desert falls silent. You turn around — and see no footprints. The wind has erased them. But something remains. You are no longer a wanderer. You are the desert itself.' }, lang)}_`,
+    '',
+    `*${tr({ ru: 'Твоё странствие', en: 'Your journey' }, lang)}*`,
+    `${tr({ ru: 'Дней', en: 'Days' }, lang)}: ${state.day - 1}`,
+    `${tr({ ru: 'Путь', en: 'Distance' }, lang)}: ${state.distance}`,
+    `${tr({ ru: 'Прозрение', en: 'Insight' }, lang)}: ${state.insight}`,
+    '',
+    tr({ ru: 'Нажми «Новое странствие», чтобы начать заново.', en: 'Tap "New journey" to begin again.' }, lang),
   ].join('\n');
 }
 
@@ -214,8 +232,7 @@ export async function POST(req: NextRequest) {
       if (session.state.awaitingChoice === 'koan' && session.state.currentKoanId) {
         await sendMessage(chatId, buildKoanMessage(session.state, session.lang), koanKeyboard(session.state.currentKoanId, session.lang));
       } else if (session.state.awaitingChoice === 'encounter' && session.state.currentEncounter) {
-        const lastEntry = session.state.journal[0];
-        await sendMessage(chatId, buildEncounterMessage(session.state, session.lang, lastEntry?.answerText ?? '', lastEntry?.desertResponse ?? ''), encounterKeyboard(session.state.currentEncounter, session.lang));
+        await sendMessage(chatId, buildEncounterMessage(session.state, session.lang), encounterKeyboard(session.state.currentEncounter, session.lang));
       } else {
         await sendMessage(chatId, buildStatsMessage(session.state, session.lang), mainMenuKeyboard(session.lang));
       }
@@ -261,8 +278,7 @@ export async function POST(req: NextRequest) {
       if (session.state.awaitingChoice === 'koan' && session.state.currentKoanId) {
         await sendMessage(chatId, buildKoanMessage(session.state, session.lang), koanKeyboard(session.state.currentKoanId, session.lang));
       } else if (session.state.awaitingChoice === 'encounter' && session.state.currentEncounter) {
-        const lastEntry = session.state.journal[0];
-        await sendMessage(chatId, buildEncounterMessage(session.state, session.lang, lastEntry?.answerText ?? '', lastEntry?.desertResponse ?? ''), encounterKeyboard(session.state.currentEncounter, session.lang));
+        await sendMessage(chatId, buildEncounterMessage(session.state, session.lang), encounterKeyboard(session.state.currentEncounter, session.lang));
       } else {
         await sendMessage(chatId, buildStatsMessage(session.state, session.lang), mainMenuKeyboard(session.lang));
       }
@@ -274,31 +290,28 @@ export async function POST(req: NextRequest) {
       const idx = parseInt(data.slice(4), 10);
       const koan = KOANS.find((k) => k.id === session.state!.currentKoanId);
       if (koan && koan.options[idx]) {
-        const opt = koan.options[idx]!;
-        const answerText = tr(opt.text, session.lang);
-        const desertResponse = tr(opt.response, session.lang);
         const { state: newState } = resolveKoanAnswer(session.state, koan, idx, session.lang);
         session.state = newState;
-        // Encounter message
-        await sendMessage(chatId, buildEncounterMessage(newState, session.lang, answerText, desertResponse), encounterKeyboard(newState.currentEncounter!, session.lang));
+        // Encounter message — uses pendingAnswer/pendingResponse from state
+        await sendMessage(chatId, buildEncounterMessage(newState, session.lang), encounterKeyboard(newState.currentEncounter!, session.lang));
       }
     } else if (data.startsWith('enc_') && session.state?.awaitingChoice === 'encounter') {
       const idx = parseInt(data.slice(4), 10);
       const enc = session.state.currentEncounter;
-      const lastEntry = session.state.journal[0];
-      const koan = lastEntry ? KOANS.find((k) => k.id === lastEntry.koanId) ?? null : null;
-      if (enc && lastEntry) {
-        const { state: newState } = resolveEncounterChoice(
+      if (enc) {
+        const { state: newState, isFinale } = resolveEncounterChoice(
           session.state,
           enc,
           idx,
-          koan,
-          lastEntry.answerText,
-          lastEntry.desertResponse,
           session.lang,
         );
         session.state = newState;
-        await sendMessage(chatId, buildStatsMessage(newState, session.lang) + '\n\n' + buildKoanMessage(newState, session.lang), koanKeyboard(newState.currentKoanId!, session.lang));
+        if (isFinale) {
+          // Finale — game finished
+          await sendMessage(chatId, buildFinaleMessage(newState, session.lang), mainMenuKeyboard(session.lang));
+        } else {
+          await sendMessage(chatId, buildStatsMessage(newState, session.lang) + '\n\n' + buildKoanMessage(newState, session.lang), koanKeyboard(newState.currentKoanId!, session.lang));
+        }
       }
     } else {
       await sendMessage(chatId, tr(BOT.welcome, session.lang), mainMenuKeyboard(session.lang));

@@ -41,9 +41,14 @@ export interface GameState {
   phase: Phase;
   currentKoanId: string | null;
   currentEncounter: EncounterType | null;
-  awaitingChoice: 'koan' | 'encounter' | null;
+  awaitingChoice: 'koan' | 'encounter' | 'finale' | null;
+  /** Pending answer from koan stage, saved here so encounter stage can use it */
+  pendingKoanId: string | null;
+  pendingAnswer: string;
+  pendingResponse: string;
   path: PathNode[];
   journal: JournalEntry[];
+  finished: boolean;
 }
 
 export interface Settings {

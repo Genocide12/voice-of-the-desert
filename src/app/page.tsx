@@ -100,18 +100,25 @@ export default function Home() {
     }
   }, [state?.phase]);
 
-  // Narrate the current koan question when it appears (TTS reads ONLY the question text, no topic title)
+  // Narrate the current koan question IMMEDIATELY when it appears.
+  // TTS reads ONLY the question text — no topic title, no greeting, no answer narration.
+  // If the player answers before the question finishes, TTS stops and moves on.
   useEffect(() => {
     if (!state?.started || !settings.voiceEnabled) return;
     if (state.awaitingChoice === 'koan' && state.currentKoanId) {
       const koan = KOANS.find((k) => k.id === state.currentKoanId);
       if (koan) {
-        // Slight delay so ambient music doesn't overlap with speech start
+        // Stop any current narration first, then speak the new question
+        getTTS().stop();
         const timer = setTimeout(() => {
           getTTS().speak(tr(koan.question, settings.lang), settings.lang, settings.voiceGender);
-        }, 600);
+        }, 300);
         return () => clearTimeout(timer);
       }
+    }
+    // If we're NOT on a koan (encounter/finale), stop any ongoing question narration
+    if (state.awaitingChoice !== 'koan') {
+      getTTS().stop();
     }
   }, [state?.currentKoanId, state?.awaitingChoice, state?.started, settings.voiceEnabled, settings.lang, settings.voiceGender]);
 
@@ -138,31 +145,24 @@ export default function Home() {
     setPendingAnswerIdx(null);
   }, [handleButtonClick, newGame, lang]);
 
-  // Koan answer
+  // Koan answer — STOP question narration immediately, then show encounter
   const handleKoanAnswer = useCallback(
     (idx: number) => {
       if (!state) return;
       const koan = getCurrentKoan(state);
       if (!koan) return;
       handleButtonClick();
+      // STOP TTS immediately — don't finish the question, move to encounter
+      getTTS().stop();
       const opt = koan.options[idx];
       if (!opt) return;
       const { state: newState } = resolveKoanAnswer(state, koan, idx, lang);
       setKoanAnswered(newState);
       setPendingAnswerIdx(idx);
 
-      // Show desert response
+      // Show desert response (visual only — NO TTS narration of response)
       const responseText = tr(opt.response, lang);
       setDesertResponse(responseText);
-
-      // TTS narrate ONLY the desert's response (player's answer is NOT narrated)
-      if (settings.voiceEnabled) {
-        const audio = getAudioEngine();
-        audio.setPhase('night');
-        getTTS().speak(responseText, lang, settings.voiceGender, () => {
-          audio.setPhase(newState.phase);
-        });
-      }
 
       // Insight haptic
       if (opt.insight > 0) getHaptics().success();
@@ -176,15 +176,15 @@ export default function Home() {
       // Wind sound on encounter transition
       setTimeout(() => getAudioEngine().wind(2), 500);
 
-      // Auto-clear response after a delay and move to encounter
+      // Auto-clear response after a delay
       setTimeout(() => {
         setDesertResponse(null);
       }, 6000);
     },
-    [state, lang, settings.voiceEnabled, settings.voiceGender, handleButtonClick, setKoanAnswered],
+    [state, lang, handleButtonClick, setKoanAnswered],
   );
 
-  // Encounter choice
+  // Encounter choice — uses pendingAnswer/pendingResponse from state (not journal[0])
   const handleEncounterChoice = useCallback(
     (idx: number) => {
       if (!state || !state.currentEncounter) return;
@@ -192,18 +192,12 @@ export default function Home() {
       const choice = choices[idx];
       if (!choice) return;
       handleButtonClick();
+      getTTS().stop();
 
-      const koan = state.currentKoanId ? KOANS.find((k) => k.id === state.currentKoanId) ?? null : null;
-      const lastAnswer = state.journal[0]?.answerText ?? '';
-      const lastResponse = state.journal[0]?.desertResponse ?? '';
-
-      const { state: newState, journalEntry } = resolveEncounterChoice(
+      const { state: newState, isFinale } = resolveEncounterChoice(
         state,
         state.currentEncounter,
         idx,
-        koan,
-        lastAnswer,
-        lastResponse,
         lang,
       );
       setEncounterResolved(newState);
@@ -211,11 +205,6 @@ export default function Home() {
       // Show result
       const resultText = tr(choice.result, lang);
       setShowResponse({ text: resultText, insight: choice.insight });
-
-      // TTS narrate ONLY the encounter result (player's action is NOT narrated)
-      if (settings.voiceEnabled) {
-        getTTS().speak(resultText, lang, settings.voiceGender);
-      }
 
       // Haptics
       if (choice.insight > 0) getHaptics().success();
@@ -231,12 +220,18 @@ export default function Home() {
       } else if (choice.nextPhase === 'dawn') {
         setTimeout(() => getAudioEngine().bell(330), 800);
       }
+      // Bell on finale
+      if (isFinale) {
+        setTimeout(() => getAudioEngine().bell(110), 1000);
+        setTimeout(() => getAudioEngine().bell(165), 2000);
+        setTimeout(() => getAudioEngine().bell(220), 3000);
+      }
 
       setTimeout(() => {
         setShowResponse(null);
       }, 5000);
     },
-    [state, lang, settings.voiceEnabled, settings.voiceGender, handleButtonClick, setEncounterResolved],
+    [state, lang, handleButtonClick, setEncounterResolved],
   );
 
   const phaseClass = state?.phase ? `phase-${state.phase}` : 'phase-day';
@@ -278,10 +273,18 @@ export default function Home() {
         {/* Stats bar (only when game active) */}
         {state?.started && (
           <div className="px-4 py-2 flex items-center justify-between gap-2 text-xs">
-            <Stat icon={PHASE_ICONS[state.phase]} label={tr(UI.phase, lang)} value={tr(state.phase === 'day' ? UI.phaseDay : state.phase === 'dusk' ? UI.phaseDusk : state.phase === 'night' ? UI.phaseNight : UI.phaseDawn, lang)} />
-            <Stat icon={Sun} label={tr(UI.day, lang)} value={String(state.day)} />
-            <Stat icon={Compass} label={tr(UI.distance, lang)} value={String(state.distance)} />
-            <Stat icon={BookOpen} label={tr(UI.insight, lang)} value={String(state.insight)} />
+            <TouchTooltip content={tr(UI.tooltipPhase, lang)} side="bottom">
+              <div className="flex-1"><Stat icon={PHASE_ICONS[state.phase]} label={tr(UI.phase, lang)} value={tr(state.phase === 'day' ? UI.phaseDay : state.phase === 'dusk' ? UI.phaseDusk : state.phase === 'night' ? UI.phaseNight : UI.phaseDawn, lang)} /></div>
+            </TouchTooltip>
+            <TouchTooltip content={tr(UI.tooltipDay, lang)} side="bottom">
+              <div className="flex-1"><Stat icon={Sun} label={tr(UI.day, lang)} value={String(state.day)} /></div>
+            </TouchTooltip>
+            <TouchTooltip content={tr(UI.tooltipDistance, lang)} side="bottom">
+              <div className="flex-1"><Stat icon={Compass} label={tr(UI.distance, lang)} value={String(state.distance)} /></div>
+            </TouchTooltip>
+            <TouchTooltip content={tr(UI.tooltipInsight, lang)} side="bottom">
+              <div className="flex-1"><Stat icon={BookOpen} label={tr(UI.insight, lang)} value={String(state.insight)} /></div>
+            </TouchTooltip>
           </div>
         )}
 
@@ -407,6 +410,12 @@ function JourneyView({ state, lang, onKoanAnswer, onEncounterChoice, desertRespo
   onNewGame: () => void;
 }) {
   if (!state) return null;
+
+  // FINALE view — game finished
+  if (state.awaitingChoice === 'finale' || state.finished) {
+    return <FinaleView state={state} lang={lang} onNewGame={onNewGame} />;
+  }
+
   const koan = getCurrentKoan(state);
   const encounterChoices = getCurrentEncounterChoices(state);
 
@@ -448,9 +457,11 @@ function JourneyView({ state, lang, onKoanAnswer, onEncounterChoice, desertRespo
 
         <div className="flex flex-col gap-2">
           {encounterChoices.map((c, i) => (
-            <Button key={i} variant="outline" className="justify-start text-left min-h-[48px] px-4 py-3 whitespace-normal h-auto" onClick={() => onEncounterChoice(i)}>
-              <span className="text-sm">{tr(c.text, lang)}</span>
-            </Button>
+            <TouchTooltip key={i} content={tr(UI.tooltipEncounterChoice, lang)} side="top">
+              <Button variant="outline" className="justify-start text-left min-h-[48px] px-4 py-3 whitespace-normal h-auto w-full" onClick={() => onEncounterChoice(i)}>
+                <span className="text-sm">{tr(c.text, lang)}</span>
+              </Button>
+            </TouchTooltip>
           ))}
         </div>
       </div>
@@ -478,9 +489,11 @@ function JourneyView({ state, lang, onKoanAnswer, onEncounterChoice, desertRespo
 
         <div className="flex flex-col gap-2">
           {koan.options.map((opt, i) => (
-            <Button key={i} variant="outline" className="justify-start text-left min-h-[48px] px-4 py-3 whitespace-normal h-auto" onClick={() => onKoanAnswer(i)}>
-              <span className="text-sm">{tr(opt.text, lang)}</span>
-            </Button>
+            <TouchTooltip key={i} content={tr(UI.tooltipAnswer, lang)} side="top">
+              <Button variant="outline" className="justify-start text-left min-h-[48px] px-4 py-3 whitespace-normal h-auto w-full" onClick={() => onKoanAnswer(i)}>
+                <span className="text-sm">{tr(opt.text, lang)}</span>
+              </Button>
+            </TouchTooltip>
           ))}
         </div>
 
@@ -498,6 +511,41 @@ function JourneyView({ state, lang, onKoanAnswer, onEncounterChoice, desertRespo
     <div className="text-center py-12">
       <p className="text-sm opacity-60">{tr(UI.journalEmpty, lang)}</p>
       <Button className="mt-4" onClick={onNewGame}>{tr(UI.newGame, lang)}</Button>
+    </div>
+  );
+}
+
+function FinaleView({ state, lang, onNewGame }: { state: NonNullable<ReturnType<typeof useGameStore>['state']>; lang: Lang; onNewGame: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center text-center gap-6 px-4 py-8 max-w-md mx-auto">
+      <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 1.5 }}>
+        <div className="text-6xl mb-4">🌅</div>
+        <h2 className="text-2xl font-serif font-semibold mb-4">{tr(UI.finaleTitle, lang)}</h2>
+        <p className="text-sm italic opacity-80 leading-relaxed mb-6">{tr(UI.finaleBody, lang)}</p>
+      </motion.div>
+
+      <Card className="p-4 w-full border-primary/30">
+        <div className="text-xs uppercase tracking-wide opacity-60 mb-2">{tr(UI.finaleStats, lang)}</div>
+        <div className="flex justify-around text-center">
+          <div>
+            <div className="text-2xl font-serif">{state.day - 1}</div>
+            <div className="text-[10px] opacity-60">{tr(UI.day, lang)}</div>
+          </div>
+          <div>
+            <div className="text-2xl font-serif">{state.distance}</div>
+            <div className="text-[10px] opacity-60">{tr(UI.distance, lang)}</div>
+          </div>
+          <div>
+            <div className="text-2xl font-serif">{state.insight}</div>
+            <div className="text-[10px] opacity-60">{tr(UI.insight, lang)}</div>
+          </div>
+        </div>
+      </Card>
+
+      <Button size="lg" onClick={onNewGame} className="min-h-[48px] px-8">
+        <RotateCcw className="w-4 h-4 mr-2" />
+        {tr(UI.playAgain, lang)}
+      </Button>
     </div>
   );
 }
