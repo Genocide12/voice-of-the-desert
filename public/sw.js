@@ -1,11 +1,15 @@
 // Service worker for "Voice of the Desert" PWA
-const CACHE_NAME = 'desert-v1';
+const CACHE_NAME = 'desert-v2';
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
+  '/icons/apple-touch-icon.png',
+  '/icons/favicon-32.png',
   '/icons/icon.svg',
+  '/images/hero.png',
+  '/images/bg-texture.jpg',
 ];
 
 self.addEventListener('install', (event) => {

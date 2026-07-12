@@ -400,9 +400,15 @@ function StartScreen({ lang, onStart }: { lang: Lang; onStart: () => void }) {
   return (
     <div className="h-full flex flex-col items-center justify-center text-center gap-6 px-4">
       <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 1.2 }} className="flex flex-col items-center gap-4">
-        <div className="relative">
-          <Sun className="w-20 h-20 text-primary animate-pulse" style={{ animationDuration: '4s' }} />
-          {lang === 'ru' ? null : null}
+        {/* Hero image */}
+        <div className="relative w-full max-w-xs aspect-square rounded-2xl overflow-hidden shadow-2xl">
+          <img
+            src="/images/hero.png"
+            alt=""
+            className="w-full h-full object-cover"
+            draggable={false}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/30 to-transparent" />
         </div>
         <div>
           <h2 className="text-2xl font-serif font-semibold mb-2">{tr(UI.title, lang)}</h2>
