@@ -340,9 +340,14 @@ export async function POST(req: NextRequest) {
         if (isAnswer) {
           // Koan answer
           try {
+            console.log('[ans_] decoded state:', JSON.stringify({ currentKoanId: state.currentKoanId, lang, idx, stateEnc }));
             const koan = KOANS.find((k) => k.id === state.currentKoanId);
-            if (!koan || !koan.options[idx]) {
-              await sendMessage(chatId, 'Invalid option. Type /new to start over.', mainMenuKeyboard(lang));
+            if (!koan) {
+              await sendMessage(chatId, `Koan not found (id: ${state.currentKoanId}). Type /new to start over.`, mainMenuKeyboard(lang));
+              return NextResponse.json({ ok: true });
+            }
+            if (!koan.options[idx]) {
+              await sendMessage(chatId, `Invalid option (idx: ${idx}). Type /new to start over.`, mainMenuKeyboard(lang));
               return NextResponse.json({ ok: true });
             }
             const { state: newState } = resolveKoanAnswer(state, koan, idx, lang);
@@ -350,7 +355,7 @@ export async function POST(req: NextRequest) {
             const kb = encounterKeyboard(newState.currentEncounter!, newState, lang);
             await sendMessage(chatId, msg, kb);
           } catch (innerE) {
-            console.error('ans_ error:', innerE);
+            console.error('ans_ error:', innerE, 'data:', data);
             await sendMessage(chatId, 'Error: ' + (innerE instanceof Error ? innerE.message : 'unknown'), mainMenuKeyboard(lang));
           }
         } else {
