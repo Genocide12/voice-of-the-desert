@@ -63,9 +63,10 @@ export function resolveKoanAnswer(
     path: [...state.path, newNode],
     phase: nextPhase,
     // SAVE pending data so resolveEncounterChoice can build a full journal entry
+    // Defensive: use ?? '' in case text/response is undefined
     pendingKoanId: koan.id,
-    pendingAnswer: option.text[lang],
-    pendingResponse: option.response[lang],
+    pendingAnswer: option.text?.[lang] ?? option.text?.ru ?? '',
+    pendingResponse: option.response?.[lang] ?? option.response?.ru ?? '',
   };
 
   return { state: newState, option, encounter };
@@ -90,11 +91,11 @@ export function resolveEncounterChoice(
     day: state.day,
     phase: state.phase,
     koanId: koan?.id ?? state.pendingKoanId ?? 'unknown',
-    koanQuestion: koan?.question[lang] ?? '',
+    koanQuestion: koan?.question?.[lang] ?? koan?.question?.ru ?? '',
     answerText: state.pendingAnswer,
     desertResponse: state.pendingResponse,
     encounter,
-    encounterResult: choice.result[lang],
+    encounterResult: choice.result?.[lang] ?? choice.result?.ru ?? '',
     insightDelta: choice.insight,
     timestamp: Date.now(),
   };

@@ -140,8 +140,9 @@ async function editMessage(chatId: number, messageId: number, text: string, repl
   });
 }
 
-function tr(loc: Localized, lang: Lang): string {
-  return loc[lang] ?? loc.ru;
+function tr(loc: Localized | undefined, lang: Lang): string {
+  if (!loc) return '';
+  return loc[lang] ?? loc.ru ?? '';
 }
 
 // ====== Inline keyboards with state encoding ======
@@ -221,9 +222,14 @@ function buildKoanMessage(state: GameState, lang: Lang): string {
 function buildEncounterMessage(state: GameState, lang: Lang): string {
   const enc = state.currentEncounter;
   if (!enc) return tr(BOT.emptyJourney, lang);
-  const name = tr(ENCOUNTER_NAMES[enc], lang);
-  const descArr = ENCOUNTER_DESCRIPTIONS[enc][lang];
-  const desc = descArr[state.day % descArr.length]!;
+  const nameLoc = ENCOUNTER_NAMES[enc];
+  const descLoc = ENCOUNTER_DESCRIPTIONS[enc];
+  if (!nameLoc || !descLoc) {
+    return `*${tr(BOT.desertSpeaks, lang)}*\n\n${state.pendingResponse || '…'}`;
+  }
+  const name = tr(nameLoc, lang);
+  const descArr = descLoc[lang] ?? descLoc.ru;
+  const desc = descArr?.[state.day % descArr.length] ?? '';
   const answerText = state.pendingAnswer || '…';
   const desertResponse = state.pendingResponse || '…';
   return [
