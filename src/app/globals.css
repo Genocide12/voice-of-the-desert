@@ -236,3 +236,48 @@
   border-radius: 3px;
   opacity: 0.4;
 }
+
+/* ========================================
+   Visual haptic feedback (fallback for Safari iOS where Vibration API is unavailable)
+   Emitted via 'desert:haptic' CustomEvent; the active button gets a brief scale pulse.
+   ======================================== */
+@keyframes haptic-soft {
+  0% { transform: scale(1); }
+  40% { transform: scale(0.96); filter: brightness(1.1); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+@keyframes haptic-medium {
+  0% { transform: scale(1); }
+  35% { transform: scale(0.92); filter: brightness(1.15); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+@keyframes haptic-strong {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 var(--primary); }
+  30% { transform: scale(0.88); filter: brightness(1.25); box-shadow: 0 0 0 6px color-mix(in oklch, var(--primary) 25%, transparent); }
+  100% { transform: scale(1); filter: brightness(1); box-shadow: 0 0 0 0 transparent; }
+}
+
+.haptic-pulse-soft {
+  animation: haptic-soft 220ms ease-out;
+}
+.haptic-pulse-medium {
+  animation: haptic-medium 280ms ease-out;
+}
+.haptic-pulse-strong {
+  animation: haptic-strong 360ms ease-out;
+}
+
+/* Full-screen subtle flash for strong haptics (success/warning) on iOS */
+@keyframes haptic-flash {
+  0% { opacity: 0; }
+  30% { opacity: 0.15; }
+  100% { opacity: 0; }
+}
+.haptic-flash-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: var(--primary);
+  animation: haptic-flash 300ms ease-out;
+}
