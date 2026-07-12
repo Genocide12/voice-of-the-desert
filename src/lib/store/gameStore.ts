@@ -78,7 +78,33 @@ export const useGameStore = create<GameStore>()(
     }),
     {
       name: 'desert-game-store',
-      version: 1,
+      version: 2,
+      // Migrate old persisted state to new schema (adds pending* fields, finished)
+      migrate: (persisted: any, version: number) => {
+        if (!persisted) return persisted;
+        // Ensure settings exist with all fields
+        if (persisted.settings) {
+          persisted.settings = { ...defaultSettings, ...persisted.settings };
+        }
+        // Migrate game state: if old version (1), reset state to force fresh start
+        // (old state lacks pendingKoanId/pendingAnswer/pendingResponse/finished)
+        if (version < 2 && persisted.state) {
+          // Reset state to null — user starts fresh (old incompatible state)
+          persisted.state = null;
+        }
+        // Defensive: ensure all required fields exist on state
+        if (persisted.state) {
+          const s = persisted.state;
+          s.pendingKoanId = s.pendingKoanId ?? null;
+          s.pendingAnswer = s.pendingAnswer ?? '';
+          s.pendingResponse = s.pendingResponse ?? '';
+          s.finished = s.finished ?? false;
+          if (!['koan', 'encounter', 'finale', null].includes(s.awaitingChoice)) {
+            s.awaitingChoice = null;
+          }
+        }
+        return persisted;
+      },
     },
   ),
 );

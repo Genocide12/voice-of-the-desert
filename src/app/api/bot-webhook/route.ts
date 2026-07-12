@@ -1,9 +1,20 @@
 /**
  * Telegram Bot webhook for "Voice of the Desert"
- * - In-memory sessions (casual game, acceptable)
- * - Commands: /start, /play, /new, /lang, /help
- * - Inline buttons for koans and encounters
- * - Menu button opens web app
+ * STATELESS design: full game state encoded in callback_data (≤64 bytes)
+ * No in-memory sessions needed — works on Vercel serverless.
+ *
+ * State encoding in callback_data:
+ *   Format: "s{day}_{ins}_{dist}_{phase}_{ko|en}_{id}_{lang}"
+ *   Example: "s3_12_45_1_en_k07_ru"  (day 3, insight 12, distance 45, phase dusk, encounter k07, lang ru)
+ *   phase: 0=day, 1=dusk, 2=night, 3=dawn
+ *   ko|en: 'ko' = awaiting koan answer, 'en' = awaiting encounter choice, 'fn' = finale
+ *
+ * Action callbacks:
+ *   "a{optIdx}_{state}" — answer koan with option index, then full state
+ *   "e{choiceIdx}_{state}" — encounter choice, then full state
+ *   "new" — start new game (no state)
+ *   "menu" — main menu
+ *   "lang_ru" / "lang_en" — switch language (preserved via state or default)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -21,32 +32,69 @@ import {
   getKoanForDay,
   resolveKoanAnswer,
   resolveEncounterChoice,
+  MAX_DAYS,
   type GameState,
 } from '@/lib/game/engine';
 import type { Lang } from '@/lib/game/types';
+import type { Phase } from '@/lib/game/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 25;
 
-// ====== In-memory session store ======
-interface Session {
-  state: GameState | null;
-  lang: Lang;
+// ====== State encoding/decoding ======
+const PHASE_TO_NUM: Record<Phase, number> = { day: 0, dusk: 1, night: 2, dawn: 3 };
+const NUM_TO_PHASE: Record<number, Phase> = { 0: 'day', 1: 'dusk', 2: 'night', 3: 'dawn' };
+
+function encodeState(state: GameState, lang: Lang): string {
+  const phase = PHASE_TO_NUM[state.phase] ?? 0;
+  const stage =
+    state.awaitingChoice === 'koan' ? 'ko' :
+    state.awaitingChoice === 'encounter' ? 'en' :
+    state.awaitingChoice === 'finale' ? 'fn' : 'ko';
+  const id = state.currentKoanId ?? state.currentEncounter ?? 'x';
+  // Format: s{day}_{ins}_{dist}_{phase}_{stage}_{id}_{lang}
+  return `s${state.day}_${state.insight}_${state.distance}_${phase}_${stage}_${id}_${lang}`;
 }
 
-const sessions = new Map<number, Session>();
+function decodeState(encoded: string): { state: GameState; lang: Lang } | null {
+  if (!encoded.startsWith('s')) return null;
+  try {
+    const parts = encoded.slice(1).split('_');
+    const day = parseInt(parts[0] ?? '1', 10);
+    const insight = parseInt(parts[1] ?? '0', 10);
+    const distance = parseInt(parts[2] ?? '0', 10);
+    const phaseNum = parseInt(parts[3] ?? '0', 10);
+    const stage = parts[4] ?? 'ko';
+    const id = parts[5] ?? 'x';
+    const lang = (parts[6] === 'en' ? 'en' : 'ru') as Lang;
 
-function getSession(userId: number): Session {
-  let s = sessions.get(userId);
-  if (!s) {
-    s = { state: null, lang: 'ru' };
-    sessions.set(userId, s);
+    const phase = NUM_TO_PHASE[phaseNum] ?? 'day';
+    const currentKoanId = stage === 'ko' ? id : null;
+    const currentEnc = stage === 'en' ? (id as any) : null;
+    const awaiting: GameState['awaitingChoice'] =
+      stage === 'ko' ? 'koan' : stage === 'en' ? 'encounter' : stage === 'fn' ? 'finale' : 'koan';
+
+    const state: GameState = {
+      started: true,
+      day,
+      insight,
+      distance,
+      phase,
+      currentKoanId,
+      currentEncounter: currentEnc,
+      awaitingChoice: awaiting,
+      pendingKoanId: null,
+      pendingAnswer: '',
+      pendingResponse: '',
+      path: [],
+      journal: [],
+      finished: awaiting === 'finale',
+    };
+    return { state, lang };
+  } catch {
+    return null;
   }
-  return s;
-}
-
-function tr(loc: Localized, lang: Lang): string {
-  return loc[lang] ?? loc.ru;
 }
 
 // ====== Telegram Bot API helpers ======
@@ -80,26 +128,19 @@ async function answerCallback(callbackId: string) {
   return tg('answerCallbackQuery', { callback_query_id: callbackId });
 }
 
-async function editMessage(chatId: number, messageId: number, text: string, replyMarkup?: any) {
-  return tg('editMessageText', {
-    chat_id: chatId,
-    message_id: messageId,
-    text,
-    parse_mode: 'Markdown',
-    reply_markup: replyMarkup,
-  });
+function tr(loc: Localized, lang: Lang): string {
+  return loc[lang] ?? loc.ru;
 }
 
-// ====== Inline keyboard builders ======
+// ====== Inline keyboards with state encoding ======
 function mainMenuKeyboard(lang: Lang) {
   return {
     inline_keyboard: [
       [
-        { text: tr(BOT.playGame, lang), callback_data: 'play' },
-        { text: tr(BOT.newGame, lang), callback_data: 'new' },
+        { text: tr(BOT.playGame, lang), callback_data: 'new' },
+        { text: tr(BOT.language, lang), callback_data: 'lang_menu' },
       ],
       [
-        { text: tr(BOT.language, lang), callback_data: 'lang' },
         { text: tr(BOT.helpCmd, lang), callback_data: 'help' },
       ],
       ...(WEBAPP_URL
@@ -121,24 +162,29 @@ function langKeyboard() {
   };
 }
 
-function koanKeyboard(koanId: string, lang: Lang) {
+function koanKeyboard(koanId: string, state: GameState, lang: Lang) {
   const koan = KOANS.find((k) => k.id === koanId);
   if (!koan) return mainMenuKeyboard(lang);
+  const stateEnc = encodeState(state, lang);
   return {
     inline_keyboard: [
       ...koan.options.map((opt, i) => [
-        { text: tr(opt.text, lang).slice(0, 60), callback_data: `ans_${i}` },
+        // a{idx}_{state}  — action + encoded state
+        { text: tr(opt.text, lang).slice(0, 60), callback_data: `a${i}_${stateEnc}` },
       ]),
     ],
   };
 }
 
-function encounterKeyboard(encounter: string, lang: Lang) {
+function encounterKeyboard(encounter: string, state: GameState, lang: Lang) {
   const choices = ENCOUNTER_CHOICES[encounter as keyof typeof ENCOUNTER_CHOICES];
   if (!choices) return mainMenuKeyboard(lang);
+  const stateEnc = encodeState(state, lang);
   return {
     inline_keyboard: [
-      ...choices.map((c, i) => [{ text: tr(c.text, lang).slice(0, 60), callback_data: `enc_${i}` }]),
+      ...choices.map((c, i) => [
+        { text: tr(c.text, lang).slice(0, 60), callback_data: `e${i}_${stateEnc}` },
+      ]),
     ],
   };
 }
@@ -148,8 +194,7 @@ function buildKoanMessage(state: GameState, lang: Lang): string {
   const koan = KOANS.find((k) => k.id === state.currentKoanId);
   if (!koan) return tr(BOT.emptyJourney, lang);
   const greeting = DESERT_GREETINGS[lang][state.day % DESERT_GREETINGS[lang].length]!;
-  const phaseLabel =
-    state.phase === 'day' ? '☀️' : state.phase === 'dusk' ? '🌅' : state.phase === 'night' ? '🌙' : '🌄';
+  const phaseLabel = state.phase === 'day' ? '☀️' : state.phase === 'dusk' ? '🌅' : state.phase === 'night' ? '🌙' : '🌄';
   return [
     `${phaseLabel} *День ${state.day} · ${state.distance} ${tr({ ru: 'шагов', en: 'steps' }, lang)} · ${state.insight} ${tr({ ru: 'прозрений', en: 'insights' }, lang)}*`,
     '',
@@ -167,7 +212,6 @@ function buildEncounterMessage(state: GameState, lang: Lang): string {
   const name = tr(ENCOUNTER_NAMES[enc], lang);
   const descArr = ENCOUNTER_DESCRIPTIONS[enc][lang];
   const desc = descArr[state.day % descArr.length]!;
-  // Use pendingAnswer/pendingResponse from state (saved by resolveKoanAnswer)
   const answerText = state.pendingAnswer || '…';
   const desertResponse = state.pendingResponse || '…';
   return [
@@ -217,128 +261,117 @@ export async function POST(req: NextRequest) {
     if (update.message) {
       const msg = update.message;
       const chatId = msg.chat.id;
-      const userId = msg.from?.id ?? chatId;
       const text = msg.text ?? '';
-      const session = getSession(userId);
+      // Detect lang from user
+      const lang: Lang = (msg.from?.language_code?.startsWith('en') ? 'en' : 'ru') as Lang;
 
       if (text.startsWith('/start')) {
-        await sendMessage(chatId, tr(BOT.welcome, session.lang), mainMenuKeyboard(session.lang));
+        await sendMessage(chatId, tr(BOT.welcome, lang), mainMenuKeyboard(lang));
       } else if (text.startsWith('/help')) {
-      await sendMessage(chatId, tr(BOT.help, session.lang), mainMenuKeyboard(session.lang));
-    } else if (text.startsWith('/play')) {
-      if (!session.state) {
+        await sendMessage(chatId, tr(BOT.help, lang), mainMenuKeyboard(lang));
+      } else if (text.startsWith('/play')) {
         const firstKoan = getKoanForDay(1);
-        session.state = createInitialState(firstKoan.id);
-      }
-      if (session.state.awaitingChoice === 'koan' && session.state.currentKoanId) {
-        await sendMessage(chatId, buildKoanMessage(session.state, session.lang), koanKeyboard(session.state.currentKoanId, session.lang));
-      } else if (session.state.awaitingChoice === 'encounter' && session.state.currentEncounter) {
-        await sendMessage(chatId, buildEncounterMessage(session.state, session.lang), encounterKeyboard(session.state.currentEncounter, session.lang));
+        const state = createInitialState(firstKoan.id);
+        await sendMessage(chatId, buildKoanMessage(state, lang), koanKeyboard(state.currentKoanId!, state, lang));
+      } else if (text.startsWith('/new')) {
+        const firstKoan = getKoanForDay(1);
+        const state = createInitialState(firstKoan.id);
+        await sendMessage(chatId, tr(BOT.newGameStarted, lang) + '\n\n' + buildKoanMessage(state, lang), koanKeyboard(state.currentKoanId!, state, lang));
+      } else if (text.startsWith('/lang')) {
+        await sendMessage(chatId, tr(BOT.langPrompt, lang), langKeyboard());
       } else {
-        await sendMessage(chatId, buildStatsMessage(session.state, session.lang), mainMenuKeyboard(session.lang));
+        await sendMessage(chatId, tr(BOT.welcome, lang), mainMenuKeyboard(lang));
       }
-    } else if (text.startsWith('/new')) {
-      const firstKoan = getKoanForDay(1);
-      session.state = createInitialState(firstKoan.id);
-      await sendMessage(chatId, tr(BOT.newGameStarted, session.lang) + '\n\n' + buildKoanMessage(session.state, session.lang), koanKeyboard(session.state.currentKoanId, session.lang));
-    } else if (text.startsWith('/lang')) {
-      await sendMessage(chatId, tr(BOT.langPrompt, session.lang), langKeyboard());
-    } else {
-      await sendMessage(chatId, tr(BOT.welcome, session.lang), mainMenuKeyboard(session.lang));
-    }
-    return NextResponse.json({ ok: true });
-  }
-
-  // Handle callback query
-  if (update.callback_query) {
-    const cb = update.callback_query;
-    const chatId = cb.message?.chat?.id;
-    const userId = cb.from?.id;
-    const data = cb.data ?? '';
-    if (!chatId || !userId) {
-      await answerCallback(cb.id);
       return NextResponse.json({ ok: true });
     }
-    const session = getSession(userId);
-    await answerCallback(cb.id);
 
-    if (data === 'menu') {
-      await sendMessage(chatId, tr(BOT.welcome, session.lang), mainMenuKeyboard(session.lang));
-    } else if (data === 'help') {
-      await sendMessage(chatId, tr(BOT.help, session.lang), mainMenuKeyboard(session.lang));
-    } else if (data === 'lang') {
-      await sendMessage(chatId, tr(BOT.langPrompt, session.lang), langKeyboard());
-    } else if (data === 'lang_ru' || data === 'lang_en') {
-      session.lang = data === 'lang_ru' ? 'ru' : 'en';
-      await sendMessage(chatId, tr(BOT.langChanged, session.lang), mainMenuKeyboard(session.lang));
-    } else if (data === 'play') {
-      if (!session.state) {
+    // Handle callback query
+    if (update.callback_query) {
+      const cb = update.callback_query;
+      const chatId = cb.message?.chat?.id;
+      const data = cb.data ?? '';
+      if (!chatId) {
+        await answerCallback(cb.id);
+        return NextResponse.json({ ok: true });
+      }
+      await answerCallback(cb.id);
+
+      // Parse callback data
+      // Format options:
+      //   menu, help, lang_menu, lang_ru, lang_en, new
+      //   a{idx}_s{state}  — koan answer
+      //   e{idx}_s{state}  — encounter choice
+
+      if (data === 'menu') {
+        // Detect lang from callback user
+        const lang: Lang = (cb.from?.language_code?.startsWith('en') ? 'en' : 'ru') as Lang;
+        await sendMessage(chatId, tr(BOT.welcome, lang), mainMenuKeyboard(lang));
+      } else if (data === 'help') {
+        const lang: Lang = (cb.from?.language_code?.startsWith('en') ? 'en' : 'ru') as Lang;
+        await sendMessage(chatId, tr(BOT.help, lang), mainMenuKeyboard(lang));
+      } else if (data === 'lang_menu') {
+        await sendMessage(chatId, tr(BOT.langPrompt, 'ru'), langKeyboard());
+      } else if (data === 'lang_ru' || data === 'lang_en') {
+        const lang: Lang = data === 'lang_ru' ? 'ru' : 'en';
+        await sendMessage(chatId, tr(BOT.langChanged, lang), mainMenuKeyboard(lang));
+      } else if (data === 'new') {
+        const lang: Lang = (cb.from?.language_code?.startsWith('en') ? 'en' : 'ru') as Lang;
         const firstKoan = getKoanForDay(1);
-        session.state = createInitialState(firstKoan.id);
-      }
-      if (session.state.awaitingChoice === 'koan' && session.state.currentKoanId) {
-        await sendMessage(chatId, buildKoanMessage(session.state, session.lang), koanKeyboard(session.state.currentKoanId, session.lang));
-      } else if (session.state.awaitingChoice === 'encounter' && session.state.currentEncounter) {
-        await sendMessage(chatId, buildEncounterMessage(session.state, session.lang), encounterKeyboard(session.state.currentEncounter, session.lang));
-      } else {
-        await sendMessage(chatId, buildStatsMessage(session.state, session.lang), mainMenuKeyboard(session.lang));
-      }
-    } else if (data === 'new') {
-      const firstKoan = getKoanForDay(1);
-      session.state = createInitialState(firstKoan.id);
-      await sendMessage(chatId, tr(BOT.newGameStarted, session.lang) + '\n\n' + buildKoanMessage(session.state, session.lang), koanKeyboard(session.state.currentKoanId, session.lang));
-    } else if (data.startsWith('ans_') && session.state?.awaitingChoice === 'koan') {
-      try {
-        const idx = parseInt(data.slice(4), 10);
-        const koan = KOANS.find((k) => k.id === session.state!.currentKoanId);
-        if (!koan) {
-          await sendMessage(chatId, 'Koan not found. Type /new to start over.', mainMenuKeyboard(session.lang));
+        const state = createInitialState(firstKoan.id);
+        await sendMessage(chatId, tr(BOT.newGameStarted, lang) + '\n\n' + buildKoanMessage(state, lang), koanKeyboard(state.currentKoanId!, state, lang));
+      } else if (data.startsWith('a') || data.startsWith('e')) {
+        // Parse action + state
+        const isAnswer = data.startsWith('a');
+        const rest = data.slice(1); // remove 'a' or 'e'
+        const stateStart = rest.indexOf('_s');
+        if (stateStart === -1) {
+          await sendMessage(chatId, 'Session expired. Type /new to start over.', mainMenuKeyboard('ru'));
           return NextResponse.json({ ok: true });
         }
-        if (!koan.options[idx]) {
-          await sendMessage(chatId, 'Invalid option.', mainMenuKeyboard(session.lang));
+        const idx = parseInt(rest.slice(0, stateStart), 10);
+        const stateEnc = rest.slice(stateStart + 1); // includes 's' prefix
+        const decoded = decodeState(stateEnc);
+        if (!decoded) {
+          await sendMessage(chatId, 'Session expired. Type /new to start over.', mainMenuKeyboard('ru'));
           return NextResponse.json({ ok: true });
         }
-        const { state: newState } = resolveKoanAnswer(session.state!, koan, idx, session.lang);
-        session.state = newState;
-        // Encounter message — uses pendingAnswer/pendingResponse from state
-        const msg = buildEncounterMessage(newState, session.lang);
-        const kb = encounterKeyboard(newState.currentEncounter!, session.lang);
-        await sendMessage(chatId, msg, kb);
-      } catch (innerE) {
-        console.error('ans_ handler error:', innerE);
-        await sendMessage(chatId, 'Error: ' + (innerE instanceof Error ? innerE.message : 'unknown'), mainMenuKeyboard(session.lang));
-      }
-    } else if (data.startsWith('enc_') && session.state?.awaitingChoice === 'encounter') {
-      const idx = parseInt(data.slice(4), 10);
-      const enc = session.state.currentEncounter;
-      if (enc) {
-        const { state: newState, isFinale } = resolveEncounterChoice(
-          session.state,
-          enc,
-          idx,
-          session.lang,
-        );
-        session.state = newState;
-        if (isFinale) {
-          // Finale — game finished
-          await sendMessage(chatId, buildFinaleMessage(newState, session.lang), mainMenuKeyboard(session.lang));
-        } else {
-          await sendMessage(chatId, buildStatsMessage(newState, session.lang) + '\n\n' + buildKoanMessage(newState, session.lang), koanKeyboard(newState.currentKoanId!, session.lang));
-        }
-      }
-    } else {
-      await sendMessage(chatId, tr(BOT.welcome, session.lang), mainMenuKeyboard(session.lang));
-    }
-    return NextResponse.json({ ok: true });
-  }
+        const { state, lang } = decoded;
 
-  return NextResponse.json({ ok: true });
+        if (isAnswer) {
+          // Koan answer
+          const koan = KOANS.find((k) => k.id === state.currentKoanId);
+          if (!koan || !koan.options[idx]) {
+            await sendMessage(chatId, 'Invalid option. Type /new to start over.', mainMenuKeyboard(lang));
+            return NextResponse.json({ ok: true });
+          }
+          const { state: newState } = resolveKoanAnswer(state, koan, idx, lang);
+          await sendMessage(chatId, buildEncounterMessage(newState, lang), encounterKeyboard(newState.currentEncounter!, newState, lang));
+        } else {
+          // Encounter choice
+          const enc = state.currentEncounter;
+          if (!enc) {
+            await sendMessage(chatId, 'Invalid encounter. Type /new to start over.', mainMenuKeyboard(lang));
+            return NextResponse.json({ ok: true });
+          }
+          const { state: newState, isFinale } = resolveEncounterChoice(state, enc, idx, lang);
+          if (isFinale) {
+            await sendMessage(chatId, buildFinaleMessage(newState, lang), mainMenuKeyboard(lang));
+          } else {
+            await sendMessage(chatId, buildStatsMessage(newState, lang) + '\n\n' + buildKoanMessage(newState, lang), koanKeyboard(newState.currentKoanId!, newState, lang));
+          }
+        }
+      } else {
+        const lang: Lang = (cb.from?.language_code?.startsWith('en') ? 'en' : 'ru') as Lang;
+        await sendMessage(chatId, tr(BOT.welcome, lang), mainMenuKeyboard(lang));
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    return NextResponse.json({ ok: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Unknown error';
-    const stack = e instanceof Error ? e.stack : '';
-    console.error('Webhook error:', msg, stack);
-    return NextResponse.json({ ok: false, error: msg, stack: stack?.split('\n').slice(0, 5).join(' | ') }, { status: 200 });
+    console.error('Webhook error:', msg);
+    return NextResponse.json({ ok: false, error: msg }, { status: 200 });
   }
 }
 
@@ -348,7 +381,9 @@ export async function GET() {
     ok: true,
     service: 'voice-of-the-desert-bot',
     webhook: 'active',
+    stateless: true,
     hasToken: !!BOT_TOKEN,
     hasWebappUrl: !!WEBAPP_URL,
+    maxDays: MAX_DAYS,
   });
 }

@@ -271,19 +271,19 @@ export default function Home() {
         </header>
 
         {/* Stats bar (only when game active) */}
-        {state?.started && (
+        {state?.started && state?.phase && PHASE_ICONS[state.phase] && (
           <div className="px-4 py-2 flex items-center justify-between gap-2 text-xs">
             <TouchTooltip content={tr(UI.tooltipPhase, lang)} side="bottom">
               <div className="flex-1"><Stat icon={PHASE_ICONS[state.phase]} label={tr(UI.phase, lang)} value={tr(state.phase === 'day' ? UI.phaseDay : state.phase === 'dusk' ? UI.phaseDusk : state.phase === 'night' ? UI.phaseNight : UI.phaseDawn, lang)} /></div>
             </TouchTooltip>
             <TouchTooltip content={tr(UI.tooltipDay, lang)} side="bottom">
-              <div className="flex-1"><Stat icon={Sun} label={tr(UI.day, lang)} value={String(state.day)} /></div>
+              <div className="flex-1"><Stat icon={Sun} label={tr(UI.day, lang)} value={String(state.day ?? 1)} /></div>
             </TouchTooltip>
             <TouchTooltip content={tr(UI.tooltipDistance, lang)} side="bottom">
-              <div className="flex-1"><Stat icon={Compass} label={tr(UI.distance, lang)} value={String(state.distance)} /></div>
+              <div className="flex-1"><Stat icon={Compass} label={tr(UI.distance, lang)} value={String(state.distance ?? 0)} /></div>
             </TouchTooltip>
             <TouchTooltip content={tr(UI.tooltipInsight, lang)} side="bottom">
-              <div className="flex-1"><Stat icon={BookOpen} label={tr(UI.insight, lang)} value={String(state.insight)} /></div>
+              <div className="flex-1"><Stat icon={BookOpen} label={tr(UI.insight, lang)} value={String(state.insight ?? 0)} /></div>
             </TouchTooltip>
           </div>
         )}
