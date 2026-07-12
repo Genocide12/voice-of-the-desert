@@ -1014,12 +1014,12 @@ export const DAILY_KOAN_INTROS: LocalizedList = {
 
 export const BOT = {
   welcome: {
-    ru: '🏜️ *Голос Пустыни*\n\nТы — странствующий монах на краю мира. Каждый день пустыня задаёт тебе коан. Твой ответ определяет твой путь.\n\nВыбери действие ниже или открой веб-версию для полного опыта.',
-    en: '🏜️ *Voice of the Desert*\n\nYou are a wandering monk at the edge of the world. Each day the desert asks you a koan. Your answer shapes your path.\n\nChoose an action below or open the web version for the full experience.',
+    ru: '🏜️ *Голос Пустыни*\n\nТы — странствующий монах на краю мира. Каждый день пустыня задаёт тебе коан. Твой ответ определяет твой путь.\n\nНажми *🎮 Играть* для начала или открой веб-версию для полного опыта со звуком и озвучкой.',
+    en: '🏜️ *Voice of the Desert*\n\nYou are a wandering monk at the edge of the world. Each day the desert asks you a koan. Your answer shapes your path.\n\nTap *🎮 Play* to begin or open the web version for full experience with sound and voice.',
   },
   help: {
-    ru: 'Команды:\n/play — продолжить странствие\n/new — новое странствие\n/lang — сменить язык\n/help — эта справка\n\nИли открой веб-версию кнопкой меню.',
-    en: 'Commands:\n/play — continue the journey\n/new — new journey\n/lang — switch language\n/help — this help\n\nOr open the web version via the menu button.',
+    ru: '🏜️ *Голос Пустыни — Справка*\n\n*Как играть:*\n1. Пустыня задаёт коан (философский вопрос)\n2. Выбери один из трёх ответов\n3. Пустыня ответит и приведёт тебя к встрече\n4. Выбери действие во встрече\n5. Перейдёшь к следующему коану\n\n*Цель:* Пройти 12 коанов и достичь финала.\n\n*Команды:*\n/play — продолжить странствие\n/new — новое странствие с начала\n/lang — сменить язык (RU/EN)\n/help — эта справка\n\n*Веб-версия:* открой кнопкой меню 🖥️ — полный опыт со звуком, музыкой, озвучкой TTS, картой пути и журналом.\n\n*Прогресс:* сохраняется автоматически в кнопках. Можно закрыть чат и вернуться позже.',
+    en: '🏜️ *Voice of the Desert — Help*\n\n*How to play:*\n1. The desert asks a koan (philosophical question)\n2. Choose one of three answers\n3. The desert responds and leads you to an encounter\n4. Choose an action in the encounter\n5. Move to the next koan\n\n*Goal:* Complete 12 koans and reach the finale.\n\n*Commands:*\n/play — continue the journey\n/new — new journey from start\n/lang — switch language (RU/EN)\n/help — this help\n\n*Web version:* open via menu button 🖥️ — full experience with sound, music, TTS voice, path map and journal.\n\n*Progress:* saved automatically in buttons. You can close chat and return later.',
   },
   chooseAnswer: { ru: 'Выбери ответ:', en: 'Choose your answer:' },
   chooseAction: { ru: 'Что ты сделаешь?', en: 'What will you do?' },

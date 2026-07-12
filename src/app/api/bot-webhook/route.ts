@@ -150,27 +150,28 @@ function mainMenuKeyboard(lang: Lang) {
   return {
     inline_keyboard: [
       [
-        { text: tr(BOT.playGame, lang), callback_data: 'new' },
-        { text: tr(BOT.language, lang), callback_data: 'lang_menu' },
+        { text: '🎮 ' + tr(BOT.playGame, lang), callback_data: 'new' },
+        { text: '🌐 ' + tr(BOT.language, lang), callback_data: 'lang_menu' },
       ],
       [
-        { text: tr(BOT.helpCmd, lang), callback_data: 'help' },
+        { text: '❓ ' + tr(BOT.helpCmd, lang), callback_data: 'help' },
       ],
       ...(WEBAPP_URL
-        ? [[{ text: tr(BOT.openWeb, lang), web_app: { url: WEBAPP_URL } }]]
+        ? [[{ text: '🖥️ ' + tr(BOT.openWeb, lang), web_app: { url: WEBAPP_URL } }]]
         : []),
     ],
   };
 }
 
-function langKeyboard() {
+function langKeyboard(lang: Lang) {
+  const back = lang === 'ru' ? '← Назад' : '← Back';
   return {
     inline_keyboard: [
       [
         { text: '🇷🇺 Русский', callback_data: 'lang_ru' },
         { text: '🇬🇧 English', callback_data: 'lang_en' },
       ],
-      [{ text: '← Back', callback_data: 'menu' }],
+      [{ text: back, callback_data: 'menu' }],
     ],
   };
 }
@@ -300,7 +301,7 @@ export async function POST(req: NextRequest) {
         const state = createInitialState(firstKoan.id);
         await sendMessage(chatId, tr(BOT.newGameStarted, lang) + '\n\n' + buildKoanMessage(state, lang), koanKeyboard(state.currentKoanId!, state, lang));
       } else if (text.startsWith('/lang')) {
-        await sendMessage(chatId, tr(BOT.langPrompt, lang), langKeyboard());
+        await sendMessage(chatId, tr(BOT.langPrompt, lang), langKeyboard(lang));
       } else {
         await sendMessage(chatId, tr(BOT.welcome, lang), mainMenuKeyboard(lang));
       }
@@ -330,7 +331,7 @@ export async function POST(req: NextRequest) {
         const lang: Lang = (cb.from?.language_code?.startsWith('en') ? 'en' : 'ru') as Lang;
         await edit(tr(BOT.help, lang), mainMenuKeyboard(lang));
       } else if (data === 'lang_menu') {
-        await edit(tr(BOT.langPrompt, 'ru'), langKeyboard());
+        await edit(tr(BOT.langPrompt, 'ru'), langKeyboard('ru'));
       } else if (data === 'lang_ru' || data === 'lang_en') {
         const lang: Lang = data === 'lang_ru' ? 'ru' : 'en';
         await edit(tr(BOT.langChanged, lang), mainMenuKeyboard(lang));
