@@ -220,12 +220,10 @@ class HapticsService {
     }
   }
 
-  /** Soft tick for button presses */
+  /** Soft tick for button presses — vibration only, like Telegram */
   click() {
     if (!this.enabled) return;
-    // Resume audio context on every click (Safari iOS requirement)
-    this.resume();
-    // 1. Telegram native (highest priority)
+    // 1. Telegram native haptics (works inside Telegram app)
     if (this.inTelegram()) {
       try {
         window.Telegram?.WebApp?.HapticFeedback?.impactOccurred('soft');
@@ -241,16 +239,12 @@ class HapticsService {
         /* ignore */
       }
     }
-    // 3. Audio haptic (ALL browsers — Safari iOS, desktop, etc.)
-    playAudioHaptic('soft');
-    // 4. Visual pulse (all platforms)
-    applyVisualPulse('soft');
+    // Note: Safari iOS does not support vibration — no fallback (per user request)
   }
 
   /** Medium tap for selection */
   select() {
     if (!this.enabled) return;
-    this.resume();
     if (this.inTelegram()) {
       try {
         window.Telegram?.WebApp?.HapticFeedback?.selectionChanged();
@@ -265,14 +259,11 @@ class HapticsService {
         /* ignore */
       }
     }
-    playAudioHaptic('medium');
-    applyVisualPulse('medium');
   }
 
   /** Success pulse for insight gain */
   success() {
     if (!this.enabled) return;
-    this.resume();
     if (this.inTelegram()) {
       try {
         window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
@@ -287,17 +278,11 @@ class HapticsService {
         /* ignore */
       }
     }
-    // Double audio haptic for success rhythm
-    playAudioHaptic('strong');
-    setTimeout(() => playAudioHaptic('medium'), 60);
-    applyVisualPulse('strong');
-    showFlashOverlay();
   }
 
   /** Warning for negative insight */
   warning() {
     if (!this.enabled) return;
-    this.resume();
     if (this.inTelegram()) {
       try {
         window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('warning');
@@ -312,10 +297,6 @@ class HapticsService {
         /* ignore */
       }
     }
-    playAudioHaptic('strong');
-    setTimeout(() => playAudioHaptic('strong'), 80);
-    applyVisualPulse('strong');
-    showFlashOverlay();
   }
 }
 

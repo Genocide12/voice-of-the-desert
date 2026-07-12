@@ -43,128 +43,128 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* DAY phase: warm ochre / ivory, illustrative feel */
+/* DAY phase: soft warm sand (muted, pastel) */
 :root,
 .phase-day {
   --radius: 0.625rem;
-  --background: oklch(0.96 0.04 70);
-  --foreground: oklch(0.28 0.06 50);
-  --card: oklch(0.98 0.03 70);
-  --card-foreground: oklch(0.28 0.06 50);
-  --popover: oklch(0.98 0.03 70);
-  --popover-foreground: oklch(0.28 0.06 50);
-  --primary: oklch(0.55 0.14 55);
-  --primary-foreground: oklch(0.98 0.02 70);
-  --secondary: oklch(0.92 0.05 70);
-  --secondary-foreground: oklch(0.32 0.06 50);
-  --muted: oklch(0.90 0.04 70);
-  --muted-foreground: oklch(0.50 0.05 55);
-  --accent: oklch(0.78 0.12 65);
-  --accent-foreground: oklch(0.28 0.06 50);
+  --background: oklch(0.97 0.015 70);
+  --foreground: oklch(0.35 0.02 50);
+  --card: oklch(0.99 0.01 70);
+  --card-foreground: oklch(0.35 0.02 50);
+  --popover: oklch(0.99 0.01 70);
+  --popover-foreground: oklch(0.35 0.02 50);
+  --primary: oklch(0.62 0.06 55);
+  --primary-foreground: oklch(0.98 0.01 70);
+  --secondary: oklch(0.93 0.02 70);
+  --secondary-foreground: oklch(0.38 0.02 50);
+  --muted: oklch(0.92 0.015 70);
+  --muted-foreground: oklch(0.55 0.02 55);
+  --accent: oklch(0.82 0.04 65);
+  --accent-foreground: oklch(0.35 0.02 50);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.85 0.05 65);
-  --input: oklch(0.85 0.05 65);
-  --ring: oklch(0.55 0.14 55);
+  --border: oklch(0.88 0.02 65);
+  --input: oklch(0.88 0.02 65);
+  --ring: oklch(0.62 0.06 55);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.96 0.04 70);
-  --sidebar-foreground: oklch(0.28 0.06 50);
-  --sidebar-primary: oklch(0.55 0.14 55);
-  --sidebar-primary-foreground: oklch(0.98 0.02 70);
-  --sidebar-accent: oklch(0.90 0.04 70);
-  --sidebar-accent-foreground: oklch(0.28 0.06 50);
-  --sidebar-border: oklch(0.85 0.05 65);
-  --sidebar-ring: oklch(0.55 0.14 55);
+  --sidebar: oklch(0.97 0.015 70);
+  --sidebar-foreground: oklch(0.35 0.02 50);
+  --sidebar-primary: oklch(0.62 0.06 55);
+  --sidebar-primary-foreground: oklch(0.98 0.01 70);
+  --sidebar-accent: oklch(0.92 0.015 70);
+  --sidebar-accent-foreground: oklch(0.35 0.02 50);
+  --sidebar-border: oklch(0.88 0.02 65);
+  --sidebar-ring: oklch(0.62 0.06 55);
 }
 
-/* DUSK phase: amber minimal */
+/* DUSK phase: soft muted amber */
 .phase-dusk {
-  --background: oklch(0.42 0.10 45);
-  --foreground: oklch(0.95 0.04 70);
-  --card: oklch(0.48 0.10 45);
-  --card-foreground: oklch(0.95 0.04 70);
-  --popover: oklch(0.48 0.10 45);
-  --popover-foreground: oklch(0.95 0.04 70);
-  --primary: oklch(0.75 0.15 60);
-  --primary-foreground: oklch(0.30 0.08 45);
-  --secondary: oklch(0.55 0.10 45);
-  --secondary-foreground: oklch(0.95 0.04 70);
-  --muted: oklch(0.50 0.09 45);
-  --muted-foreground: oklch(0.80 0.06 60);
-  --accent: oklch(0.70 0.16 55);
-  --accent-foreground: oklch(0.95 0.04 70);
-  --border: oklch(0.55 0.08 45);
-  --input: oklch(0.55 0.08 45);
-  --ring: oklch(0.75 0.15 60);
-  --sidebar: oklch(0.48 0.10 45);
-  --sidebar-foreground: oklch(0.95 0.04 70);
-  --sidebar-primary: oklch(0.75 0.15 60);
-  --sidebar-primary-foreground: oklch(0.30 0.08 45);
-  --sidebar-accent: oklch(0.55 0.10 45);
-  --sidebar-accent-foreground: oklch(0.95 0.04 70);
-  --sidebar-border: oklch(0.55 0.08 45);
-  --sidebar-ring: oklch(0.75 0.15 60);
+  --background: oklch(0.48 0.04 45);
+  --foreground: oklch(0.93 0.02 70);
+  --card: oklch(0.53 0.04 45);
+  --card-foreground: oklch(0.93 0.02 70);
+  --popover: oklch(0.53 0.04 45);
+  --popover-foreground: oklch(0.93 0.02 70);
+  --primary: oklch(0.78 0.06 60);
+  --primary-foreground: oklch(0.35 0.03 45);
+  --secondary: oklch(0.58 0.04 45);
+  --secondary-foreground: oklch(0.93 0.02 70);
+  --muted: oklch(0.55 0.035 45);
+  --muted-foreground: oklch(0.82 0.025 60);
+  --accent: oklch(0.72 0.06 55);
+  --accent-foreground: oklch(0.93 0.02 70);
+  --border: oklch(0.58 0.035 45);
+  --input: oklch(0.58 0.035 45);
+  --ring: oklch(0.78 0.06 60);
+  --sidebar: oklch(0.53 0.04 45);
+  --sidebar-foreground: oklch(0.93 0.02 70);
+  --sidebar-primary: oklch(0.78 0.06 60);
+  --sidebar-primary-foreground: oklch(0.35 0.03 45);
+  --sidebar-accent: oklch(0.55 0.035 45);
+  --sidebar-accent-foreground: oklch(0.93 0.02 70);
+  --sidebar-border: oklch(0.58 0.035 45);
+  --sidebar-ring: oklch(0.78 0.06 60);
 }
 
-/* NIGHT phase: deep mystical dark */
+/* NIGHT phase: soft muted indigo */
 .phase-night {
-  --background: oklch(0.13 0.03 270);
-  --foreground: oklch(0.90 0.04 250);
-  --card: oklch(0.18 0.04 270);
-  --card-foreground: oklch(0.90 0.04 250);
-  --popover: oklch(0.18 0.04 270);
-  --popover-foreground: oklch(0.90 0.04 250);
-  --primary: oklch(0.70 0.12 250);
-  --primary-foreground: oklch(0.13 0.03 270);
-  --secondary: oklch(0.25 0.04 270);
-  --secondary-foreground: oklch(0.90 0.04 250);
-  --muted: oklch(0.22 0.03 270);
-  --muted-foreground: oklch(0.65 0.05 250);
-  --accent: oklch(0.55 0.10 280);
-  --accent-foreground: oklch(0.90 0.04 250);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.70 0.12 250);
-  --sidebar: oklch(0.18 0.04 270);
-  --sidebar-foreground: oklch(0.90 0.04 250);
-  --sidebar-primary: oklch(0.70 0.12 250);
-  --sidebar-primary-foreground: oklch(0.13 0.03 270);
-  --sidebar-accent: oklch(0.25 0.04 270);
-  --sidebar-accent-foreground: oklch(0.90 0.04 250);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.70 0.12 250);
+  --background: oklch(0.18 0.015 270);
+  --foreground: oklch(0.88 0.015 250);
+  --card: oklch(0.22 0.02 270);
+  --card-foreground: oklch(0.88 0.015 250);
+  --popover: oklch(0.22 0.02 270);
+  --popover-foreground: oklch(0.88 0.015 250);
+  --primary: oklch(0.68 0.05 250);
+  --primary-foreground: oklch(0.15 0.015 270);
+  --secondary: oklch(0.27 0.02 270);
+  --secondary-foreground: oklch(0.88 0.015 250);
+  --muted: oklch(0.24 0.015 270);
+  --muted-foreground: oklch(0.62 0.025 250);
+  --accent: oklch(0.55 0.05 280);
+  --accent-foreground: oklch(0.88 0.015 250);
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.68 0.05 250);
+  --sidebar: oklch(0.22 0.02 270);
+  --sidebar-foreground: oklch(0.88 0.015 250);
+  --sidebar-primary: oklch(0.68 0.05 250);
+  --sidebar-primary-foreground: oklch(0.15 0.015 270);
+  --sidebar-accent: oklch(0.27 0.02 270);
+  --sidebar-accent-foreground: oklch(0.88 0.015 250);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.68 0.05 250);
 }
 
-/* DAWN phase: soft rose-gold */
+/* DAWN phase: soft muted rose */
 .phase-dawn {
-  --background: oklch(0.88 0.05 30);
-  --foreground: oklch(0.30 0.08 25);
-  --card: oklch(0.92 0.04 30);
-  --card-foreground: oklch(0.30 0.08 25);
-  --popover: oklch(0.92 0.04 30);
-  --popover-foreground: oklch(0.30 0.08 25);
-  --primary: oklch(0.60 0.16 30);
-  --primary-foreground: oklch(0.95 0.02 30);
-  --secondary: oklch(0.85 0.05 30);
-  --secondary-foreground: oklch(0.30 0.08 25);
-  --muted: oklch(0.85 0.05 30);
-  --muted-foreground: oklch(0.50 0.06 30);
-  --accent: oklch(0.75 0.12 35);
-  --accent-foreground: oklch(0.30 0.08 25);
-  --border: oklch(0.80 0.05 30);
-  --input: oklch(0.80 0.05 30);
-  --ring: oklch(0.60 0.16 30);
-  --sidebar: oklch(0.92 0.04 30);
-  --sidebar-foreground: oklch(0.30 0.08 25);
-  --sidebar-primary: oklch(0.60 0.16 30);
-  --sidebar-primary-foreground: oklch(0.95 0.02 30);
-  --sidebar-accent: oklch(0.85 0.05 30);
-  --sidebar-accent-foreground: oklch(0.30 0.08 25);
-  --sidebar-border: oklch(0.80 0.05 30);
-  --sidebar-ring: oklch(0.60 0.16 30);
+  --background: oklch(0.91 0.02 30);
+  --foreground: oklch(0.35 0.03 25);
+  --card: oklch(0.94 0.015 30);
+  --card-foreground: oklch(0.35 0.03 25);
+  --popover: oklch(0.94 0.015 30);
+  --popover-foreground: oklch(0.35 0.03 25);
+  --primary: oklch(0.62 0.06 30);
+  --primary-foreground: oklch(0.96 0.01 30);
+  --secondary: oklch(0.88 0.02 30);
+  --secondary-foreground: oklch(0.35 0.03 25);
+  --muted: oklch(0.88 0.02 30);
+  --muted-foreground: oklch(0.52 0.025 30);
+  --accent: oklch(0.78 0.04 35);
+  --accent-foreground: oklch(0.35 0.03 25);
+  --border: oklch(0.84 0.02 30);
+  --input: oklch(0.84 0.02 30);
+  --ring: oklch(0.62 0.06 30);
+  --sidebar: oklch(0.94 0.015 30);
+  --sidebar-foreground: oklch(0.35 0.03 25);
+  --sidebar-primary: oklch(0.62 0.06 30);
+  --sidebar-primary-foreground: oklch(0.96 0.01 30);
+  --sidebar-accent: oklch(0.88 0.02 30);
+  --sidebar-accent-foreground: oklch(0.35 0.03 25);
+  --sidebar-border: oklch(0.84 0.02 30);
+  --sidebar-ring: oklch(0.62 0.06 30);
 }
 
 @layer base {
@@ -235,49 +235,4 @@
   background: var(--muted-foreground);
   border-radius: 3px;
   opacity: 0.4;
-}
-
-/* ========================================
-   Visual haptic feedback (fallback for Safari iOS where Vibration API is unavailable)
-   Emitted via 'desert:haptic' CustomEvent; the active button gets a brief scale pulse.
-   ======================================== */
-@keyframes haptic-soft {
-  0% { transform: scale(1); }
-  40% { transform: scale(0.96); filter: brightness(1.1); }
-  100% { transform: scale(1); filter: brightness(1); }
-}
-@keyframes haptic-medium {
-  0% { transform: scale(1); }
-  35% { transform: scale(0.92); filter: brightness(1.15); }
-  100% { transform: scale(1); filter: brightness(1); }
-}
-@keyframes haptic-strong {
-  0% { transform: scale(1); box-shadow: 0 0 0 0 var(--primary); }
-  30% { transform: scale(0.88); filter: brightness(1.25); box-shadow: 0 0 0 6px color-mix(in oklch, var(--primary) 25%, transparent); }
-  100% { transform: scale(1); filter: brightness(1); box-shadow: 0 0 0 0 transparent; }
-}
-
-.haptic-pulse-soft {
-  animation: haptic-soft 220ms ease-out;
-}
-.haptic-pulse-medium {
-  animation: haptic-medium 280ms ease-out;
-}
-.haptic-pulse-strong {
-  animation: haptic-strong 360ms ease-out;
-}
-
-/* Full-screen subtle flash for strong haptics (success/warning) on iOS */
-@keyframes haptic-flash {
-  0% { opacity: 0; }
-  30% { opacity: 0.15; }
-  100% { opacity: 0; }
-}
-.haptic-flash-overlay {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 9999;
-  background: var(--primary);
-  animation: haptic-flash 300ms ease-out;
 }

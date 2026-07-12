@@ -152,8 +152,6 @@ export default function Home() {
     const audio = getAudioEngine();
     audio.resume();
     audio.click();
-    // Resume haptics audio context on every gesture (Safari iOS requirement)
-    getHaptics().resume();
     getHaptics().click();
   }, []);
 
