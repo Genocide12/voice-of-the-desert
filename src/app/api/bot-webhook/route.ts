@@ -288,13 +288,26 @@ export async function POST(req: NextRequest) {
       session.state = createInitialState(firstKoan.id);
       await sendMessage(chatId, tr(BOT.newGameStarted, session.lang) + '\n\n' + buildKoanMessage(session.state, session.lang), koanKeyboard(session.state.currentKoanId, session.lang));
     } else if (data.startsWith('ans_') && session.state?.awaitingChoice === 'koan') {
-      const idx = parseInt(data.slice(4), 10);
-      const koan = KOANS.find((k) => k.id === session.state!.currentKoanId);
-      if (koan && koan.options[idx]) {
-        const { state: newState } = resolveKoanAnswer(session.state, koan, idx, session.lang);
+      try {
+        const idx = parseInt(data.slice(4), 10);
+        const koan = KOANS.find((k) => k.id === session.state!.currentKoanId);
+        if (!koan) {
+          await sendMessage(chatId, 'Koan not found. Type /new to start over.', mainMenuKeyboard(session.lang));
+          return NextResponse.json({ ok: true });
+        }
+        if (!koan.options[idx]) {
+          await sendMessage(chatId, 'Invalid option.', mainMenuKeyboard(session.lang));
+          return NextResponse.json({ ok: true });
+        }
+        const { state: newState } = resolveKoanAnswer(session.state!, koan, idx, session.lang);
         session.state = newState;
         // Encounter message — uses pendingAnswer/pendingResponse from state
-        await sendMessage(chatId, buildEncounterMessage(newState, session.lang), encounterKeyboard(newState.currentEncounter!, session.lang));
+        const msg = buildEncounterMessage(newState, session.lang);
+        const kb = encounterKeyboard(newState.currentEncounter!, session.lang);
+        await sendMessage(chatId, msg, kb);
+      } catch (innerE) {
+        console.error('ans_ handler error:', innerE);
+        await sendMessage(chatId, 'Error: ' + (innerE instanceof Error ? innerE.message : 'unknown'), mainMenuKeyboard(session.lang));
       }
     } else if (data.startsWith('enc_') && session.state?.awaitingChoice === 'encounter') {
       const idx = parseInt(data.slice(4), 10);
