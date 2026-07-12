@@ -16,7 +16,6 @@ import { DESERT_VOICE, QUESTION_VOICE } from '@/lib/game/types';
 import { getAudioEngine } from '@/lib/audio/AudioEngine';
 import { getTTS } from '@/lib/audio/ttsService';
 import { getHaptics } from '@/lib/haptics';
-import { TouchTooltip } from '@/components/game/TouchTooltip';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -271,23 +270,19 @@ export default function Home() {
             </div>
           </div>
           <div className="flex items-center gap-1">
-            <TouchTooltip content={tr(UI.tooltipLang, lang)} side="bottom">
-              <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => { handleButtonClick(); setLang(lang === 'ru' ? 'en' : 'ru'); }}>
-                <Globe className="w-4 h-4" />
-              </Button>
-            </TouchTooltip>
+            <Button variant="ghost" size="icon" className="h-9 w-9" title={tr(UI.tooltipLang, lang)} onClick={() => { handleButtonClick(); setLang(lang === 'ru' ? 'en' : 'ru'); }}>
+              <Globe className="w-4 h-4" />
+            </Button>
             {installEvent && (
-              <TouchTooltip content={tr(UI.tooltipInstall, lang)} side="bottom">
-                <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => {
-                  handleButtonClick();
-                  if (installEvent) {
-                    installEvent.prompt();
-                    installEvent.userChoice.then(() => setInstallEvent(null));
-                  }
-                }}>
-                  <Download className="w-4 h-4" />
-                </Button>
-              </TouchTooltip>
+              <Button variant="ghost" size="icon" className="h-9 w-9" title={tr(UI.tooltipInstall, lang)} onClick={() => {
+                handleButtonClick();
+                if (installEvent) {
+                  installEvent.prompt();
+                  installEvent.userChoice.then(() => setInstallEvent(null));
+                }
+              }}>
+                <Download className="w-4 h-4" />
+              </Button>
             )}
           </div>
         </header>
@@ -295,18 +290,18 @@ export default function Home() {
         {/* Stats bar (only when game active) */}
         {state?.started && state?.phase && PHASE_ICONS[state.phase] && (
           <div className="px-4 py-2 flex items-stretch justify-between gap-2 text-xs">
-            <TouchTooltip content={tr(UI.tooltipPhase, lang)} side="bottom" className="flex-1 flex">
+            <div className="flex-1" title={tr(UI.tooltipPhase, lang)}>
               <Stat icon={PHASE_ICONS[state.phase]} label={tr(UI.phase, lang)} value={tr(state.phase === 'day' ? UI.phaseDay : state.phase === 'dusk' ? UI.phaseDusk : state.phase === 'night' ? UI.phaseNight : UI.phaseDawn, lang)} />
-            </TouchTooltip>
-            <TouchTooltip content={tr(UI.tooltipDay, lang)} side="bottom" className="flex-1 flex">
+            </div>
+            <div className="flex-1" title={tr(UI.tooltipDay, lang)}>
               <Stat icon={Sun} label={tr(UI.day, lang)} value={String(state.day ?? 1)} />
-            </TouchTooltip>
-            <TouchTooltip content={tr(UI.tooltipDistance, lang)} side="bottom" className="flex-1 flex">
+            </div>
+            <div className="flex-1" title={tr(UI.tooltipDistance, lang)}>
               <Stat icon={Compass} label={tr(UI.distance, lang)} value={String(state.distance ?? 0)} />
-            </TouchTooltip>
-            <TouchTooltip content={tr(UI.tooltipInsight, lang)} side="bottom" className="flex-1 flex">
+            </div>
+            <div className="flex-1" title={tr(UI.tooltipInsight, lang)}>
               <Stat icon={BookOpen} label={tr(UI.insight, lang)} value={String(state.insight ?? 0)} />
-            </TouchTooltip>
+            </div>
           </div>
         )}
 
@@ -478,11 +473,9 @@ function JourneyView({ state, lang, onKoanAnswer, onEncounterChoice, desertRespo
 
         <div className="flex flex-col gap-2">
           {encounterChoices.map((c, i) => (
-            <TouchTooltip key={i} content={tr(UI.tooltipEncounterChoice, lang)} side="top">
-              <Button variant="outline" className="justify-start text-left min-h-[48px] px-4 py-3 whitespace-normal h-auto w-full" onClick={() => onEncounterChoice(i)}>
-                <span className="text-sm">{tr(c.text, lang)}</span>
-              </Button>
-            </TouchTooltip>
+            <Button key={i} variant="outline" className="justify-start text-left min-h-[48px] px-4 py-3 whitespace-normal h-auto w-full" onClick={() => onEncounterChoice(i)}>
+              <span className="text-sm">{tr(c.text, lang)}</span>
+            </Button>
           ))}
         </div>
       </div>
@@ -507,11 +500,9 @@ function JourneyView({ state, lang, onKoanAnswer, onEncounterChoice, desertRespo
 
         <div className="flex flex-col gap-2">
           {koan.options.map((opt, i) => (
-            <TouchTooltip key={i} content={tr(UI.tooltipAnswer, lang)} side="top">
-              <Button variant="outline" className="justify-start text-left min-h-[48px] px-4 py-3 whitespace-normal h-auto w-full" onClick={() => onKoanAnswer(i)}>
-                <span className="text-sm">{tr(opt.text, lang)}</span>
-              </Button>
-            </TouchTooltip>
+            <Button key={i} variant="outline" className="justify-start text-left min-h-[48px] px-4 py-3 whitespace-normal h-auto w-full" onClick={() => onKoanAnswer(i)}>
+              <span className="text-sm">{tr(opt.text, lang)}</span>
+            </Button>
           ))}
         </div>
 
@@ -750,12 +741,10 @@ function SettingRow({ icon: Icon, iconOff: IconOff, label, tooltip, enabled, onT
   return (
     <Card className="p-4">
       <div className="flex items-center justify-between">
-        <TouchTooltip content={tooltip} side="top">
-          <div className="flex items-center gap-3 cursor-help">
-            <Icon className={`w-4 h-4 ${enabled ? 'opacity-70' : 'opacity-30'}`} />
-            <span className="text-sm">{label}</span>
-          </div>
-        </TouchTooltip>
+        <div className="flex items-center gap-3" title={tooltip}>
+          <Icon className={`w-4 h-4 ${enabled ? 'opacity-70' : 'opacity-30'}`} />
+          <span className="text-sm">{label}</span>
+        </div>
         <Switch checked={enabled} onClick={onClick} onCheckedChange={onToggle} />
       </div>
     </Card>
