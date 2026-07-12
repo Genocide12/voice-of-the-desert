@@ -322,8 +322,10 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ ok: true });
   } catch (e) {
-    console.error('Webhook error:', e);
-    return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : 'Unknown error' }, { status: 200 });
+    const msg = e instanceof Error ? e.message : 'Unknown error';
+    const stack = e instanceof Error ? e.stack : '';
+    console.error('Webhook error:', msg, stack);
+    return NextResponse.json({ ok: false, error: msg, stack: stack?.split('\n').slice(0, 5).join(' | ') }, { status: 200 });
   }
 }
 
