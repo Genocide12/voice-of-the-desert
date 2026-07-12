@@ -79,3 +79,4 @@ server.log
 
 # Caddyfile (local gateway config)
 /Caddyfile
+upload/
