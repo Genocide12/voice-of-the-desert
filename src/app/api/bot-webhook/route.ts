@@ -210,19 +210,20 @@ function buildFinaleMessage(state: GameState, lang: Lang): string {
 
 // ====== Webhook handler ======
 export async function POST(req: NextRequest) {
-  const update = await req.json();
+  try {
+    const update = await req.json();
 
-  // Handle message
-  if (update.message) {
-    const msg = update.message;
-    const chatId = msg.chat.id;
-    const userId = msg.from?.id ?? chatId;
-    const text = msg.text ?? '';
-    const session = getSession(userId);
+    // Handle message
+    if (update.message) {
+      const msg = update.message;
+      const chatId = msg.chat.id;
+      const userId = msg.from?.id ?? chatId;
+      const text = msg.text ?? '';
+      const session = getSession(userId);
 
-    if (text.startsWith('/start')) {
-      await sendMessage(chatId, tr(BOT.welcome, session.lang), mainMenuKeyboard(session.lang));
-    } else if (text.startsWith('/help')) {
+      if (text.startsWith('/start')) {
+        await sendMessage(chatId, tr(BOT.welcome, session.lang), mainMenuKeyboard(session.lang));
+      } else if (text.startsWith('/help')) {
       await sendMessage(chatId, tr(BOT.help, session.lang), mainMenuKeyboard(session.lang));
     } else if (text.startsWith('/play')) {
       if (!session.state) {
@@ -320,6 +321,10 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true });
+  } catch (e) {
+    console.error('Webhook error:', e);
+    return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : 'Unknown error' }, { status: 200 });
+  }
 }
 
 // GET endpoint for verification
