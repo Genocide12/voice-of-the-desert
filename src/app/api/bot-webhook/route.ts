@@ -61,13 +61,14 @@ function decodeState(encoded: string): { state: GameState; lang: Lang } | null {
   if (!encoded.startsWith('s')) return null;
   try {
     const parts = encoded.slice(1).split('_');
-    const day = parseInt(parts[0] ?? '1', 10);
-    const insight = parseInt(parts[1] ?? '0', 10);
-    const distance = parseInt(parts[2] ?? '0', 10);
-    const phaseNum = parseInt(parts[3] ?? '0', 10);
+    const day = parseInt(parts[0] ?? '1', 10) || 1;
+    const insight = parseInt(parts[1] ?? '0', 10) || 0;
+    const distance = parseInt(parts[2] ?? '0', 10) || 0;
+    const phaseNum = parseInt(parts[3] ?? '0', 10) || 0;
     const stage = parts[4] ?? 'ko';
     const id = parts[5] ?? 'x';
-    const lang = (parts[6] === 'en' ? 'en' : 'ru') as Lang;
+    // Robust lang detection: default to 'ru'
+    const lang: Lang = parts[6] === 'en' ? 'en' : 'ru';
 
     const phase = NUM_TO_PHASE[phaseNum] ?? 'day';
     const currentKoanId = stage === 'ko' ? id : null;
@@ -266,7 +267,11 @@ export async function POST(req: NextRequest) {
       const lang: Lang = (msg.from?.language_code?.startsWith('en') ? 'en' : 'ru') as Lang;
 
       if (text.startsWith('/start')) {
-        await sendMessage(chatId, tr(BOT.welcome, lang), mainMenuKeyboard(lang));
+        const userId = msg.from?.id;
+        const userName = msg.from?.username ?? msg.from?.first_name ?? 'friend';
+        const welcome = tr(BOT.welcome, lang);
+        const idNote = `\n\n🆔 *Твой Telegram ID: ${userId}*\nОтправь этот ID разработчику для настройки уведомлений.`;
+        await sendMessage(chatId, welcome + idNote, mainMenuKeyboard(lang));
       } else if (text.startsWith('/help')) {
         await sendMessage(chatId, tr(BOT.help, lang), mainMenuKeyboard(lang));
       } else if (text.startsWith('/play')) {
@@ -340,14 +345,9 @@ export async function POST(req: NextRequest) {
         if (isAnswer) {
           // Koan answer
           try {
-            console.log('[ans_] decoded state:', JSON.stringify({ currentKoanId: state.currentKoanId, lang, idx, stateEnc }));
             const koan = KOANS.find((k) => k.id === state.currentKoanId);
-            if (!koan) {
-              await sendMessage(chatId, `Koan not found (id: ${state.currentKoanId}). Type /new to start over.`, mainMenuKeyboard(lang));
-              return NextResponse.json({ ok: true });
-            }
-            if (!koan.options[idx]) {
-              await sendMessage(chatId, `Invalid option (idx: ${idx}). Type /new to start over.`, mainMenuKeyboard(lang));
+            if (!koan || !koan.options[idx]) {
+              await sendMessage(chatId, 'Invalid option. Type /new to start over.', mainMenuKeyboard(lang));
               return NextResponse.json({ ok: true });
             }
             const { state: newState } = resolveKoanAnswer(state, koan, idx, lang);

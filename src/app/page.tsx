@@ -100,27 +100,59 @@ export default function Home() {
     }
   }, [state?.phase]);
 
-  // Narrate the current koan question IMMEDIATELY when it appears.
-  // TTS reads ONLY the question text — no topic title, no greeting, no answer narration.
-  // If the player answers before the question finishes, TTS stops and moves on.
+  // Auto-narrate ALL blocks on the Path page when they appear.
+  // - Koan page: greeting + koan question
+  // - Encounter page: encounter name + description
+  // Stops immediately when player answers (new page appears).
   useEffect(() => {
     if (!state?.started || !settings.voiceEnabled) return;
+    const lang = settings.lang === 'en' ? 'en' : 'ru';
+
+    // KOAN page: narrate greeting + question
     if (state.awaitingChoice === 'koan' && state.currentKoanId) {
       const koan = KOANS.find((k) => k.id === state.currentKoanId);
       if (koan) {
-        // Stop any current narration first, then speak the new question
         getTTS().stop();
+        const greeting = DESERT_GREETINGS[lang][state.day % DESERT_GREETINGS[lang].length] ?? '';
+        const question = tr(koan.question, lang);
+        const fullText = greeting ? `${greeting} ${question}` : question;
         const timer = setTimeout(() => {
-          getTTS().speak(tr(koan.question, settings.lang), settings.lang, settings.voiceGender);
-        }, 300);
+          getTTS().speak(fullText, lang, settings.voiceGender);
+        }, 400);
         return () => clearTimeout(timer);
       }
     }
-    // If we're NOT on a koan (encounter/finale), stop any ongoing question narration
-    if (state.awaitingChoice !== 'koan') {
+
+    // ENCOUNTER page: narrate encounter name + description
+    if (state.awaitingChoice === 'encounter' && state.currentEncounter) {
+      const enc = state.currentEncounter;
+      const name = tr(ENCOUNTER_NAMES[enc], lang);
+      const descArr = ENCOUNTER_DESCRIPTIONS[enc][lang];
+      const desc = descArr?.[state.day % descArr.length] ?? '';
+      const answer = state.pendingAnswer;
+      const response = state.pendingResponse;
+      getTTS().stop();
+      const fullText = `${name}. ${desc}${answer ? `. ${tr(UI.youAnswered, lang)}: ${answer}` : ''}${response ? `. ${tr(UI.desertSpeaks, lang)}: ${response}` : ''}`;
+      const timer = setTimeout(() => {
+        getTTS().speak(fullText, lang, settings.voiceGender);
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+
+    // FINALE page: narrate finale
+    if (state.awaitingChoice === 'finale') {
+      getTTS().stop();
+      const timer = setTimeout(() => {
+        getTTS().speak(`${tr(UI.finaleTitle, lang)}. ${tr(UI.finaleBody, lang)}`, lang, settings.voiceGender);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+
+    // If not on a narratable page, stop
+    if (!state.awaitingChoice) {
       getTTS().stop();
     }
-  }, [state?.currentKoanId, state?.awaitingChoice, state?.started, settings.voiceEnabled, settings.lang, settings.voiceGender]);
+  }, [state?.currentKoanId, state?.currentEncounter, state?.awaitingChoice, state?.started, state?.day, state?.pendingAnswer, state?.pendingResponse, settings.voiceEnabled, settings.lang, settings.voiceGender]);
 
   const lang: Lang = settings.lang === 'en' ? 'en' : 'ru';
 
@@ -128,6 +160,8 @@ export default function Home() {
     const audio = getAudioEngine();
     audio.resume();
     audio.click();
+    // Resume haptics audio context on every gesture (Safari iOS requirement)
+    getHaptics().resume();
     getHaptics().click();
   }, []);
 
@@ -477,14 +511,11 @@ function JourneyView({ state, lang, onKoanAnswer, onEncounterChoice, desertRespo
           {greeting}
         </motion.div>
 
-        <Card className="p-6 border-primary/30 bg-card/80 backdrop-blur-sm relative">
+        <Card className="p-6 border-primary/30 bg-card/80 backdrop-blur-sm">
           <div className="text-center mb-2 text-[10px] uppercase tracking-widest opacity-50">
             {koan.tone === 'poetic' ? (lang === 'ru' ? 'Поэтический коан' : 'Poetic koan') : (lang === 'ru' ? 'Мистический коан' : 'Mystic koan')}
           </div>
-          <p className="text-lg font-serif text-center leading-relaxed pr-8">{tr(koan.question, lang)}</p>
-          <div className="absolute top-3 right-3">
-            <NarrateButton text={tr(koan.question, lang)} lang={lang} tooltip={tr({ ru: 'Озвучить вопрос', en: 'Narrate question' }, lang)} />
-          </div>
+          <p className="text-lg font-serif text-center leading-relaxed">{tr(koan.question, lang)}</p>
         </Card>
 
         <div className="flex flex-col gap-2">
@@ -738,42 +769,6 @@ function SettingsView({ settings, lang, onToggleSound, onToggleMusic, onToggleVo
         </Card>
       </div>
     </ScrollArea>
-  );
-}
-
-function NarrateButton({ text, lang, tooltip }: { text: string; lang: Lang; tooltip: string }) {
-  const settings = useGameStore((s) => s.settings);
-  const [playing, setPlaying] = useState(false);
-
-  const handleNarrate = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!settings.voiceEnabled) return;
-    const audio = getAudioEngine();
-    audio.resume();
-    audio.click();
-    getHaptics().click();
-    // Stop any current narration, then speak this text
-    getTTS().stop();
-    setPlaying(true);
-    getTTS().speak(text, lang, settings.voiceGender, () => {
-      setPlaying(false);
-    });
-  };
-
-  if (!settings.voiceEnabled) return null;
-
-  return (
-    <TouchTooltip content={tooltip} side="left">
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-8 w-8 shrink-0"
-        onClick={handleNarrate}
-        aria-label={tooltip}
-      >
-        <Volume2 className={`w-4 h-4 ${playing ? 'animate-pulse text-primary' : 'opacity-70'}`} />
-      </Button>
-    </TouchTooltip>
   );
 }
 

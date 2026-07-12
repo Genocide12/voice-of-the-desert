@@ -1,9 +1,14 @@
 /**
- * Haptics: Web Vibration API + Telegram HapticFeedback + audio tick fallback.
+ * Haptics: Web Vibration API + Telegram HapticFeedback + audio haptic engine.
  * - Telegram WebApp: native haptics (works in Telegram client)
  * - Chrome/Firefox Android: navigator.vibrate
- * - Safari iOS / desktop: AUDIO TICK fallback (short synthesized click — feels like haptic, works everywhere)
- * - All platforms: visual pulse on the clicked button
+ * - Safari iOS / ALL browsers: AUDIO HAPTIC ENGINE — synthesized "buzz" that mimics
+ *   physical vibration through speaker. Works EVERYWHERE including Safari iOS.
+ * - All platforms: visual pulse on the clicked button + flash overlay
+ *
+ * The audio haptic engine uses short bursts of low-frequency noise + sine waves
+ * that create a perceptible "thump" through the phone speaker, felt as haptic-like
+ * feedback even without vibration motor support.
  */
 
 'use client';
@@ -69,8 +74,9 @@ function showFlashOverlay() {
   setTimeout(() => overlay.remove(), 350);
 }
 
-// ====== Audio tick fallback (works on Safari iOS, all browsers) ======
+// ====== AUDIO HAPTIC ENGINE (works on ALL browsers including Safari iOS) ======
 let _audioCtx: AudioContext | null = null;
+let _masterGain: GainNode | null = null;
 
 function getAudioCtx(): AudioContext | null {
   if (typeof window === 'undefined') return null;
@@ -78,10 +84,14 @@ function getAudioCtx(): AudioContext | null {
     try {
       const AC = (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext;
       _audioCtx = new AC();
+      _masterGain = _audioCtx.createGain();
+      _masterGain.gain.value = 0.5;
+      _masterGain.connect(_audioCtx.destination);
     } catch {
       return null;
     }
   }
+  // CRITICAL: Safari iOS requires resume() on every user gesture
   if (_audioCtx.state === 'suspended') {
     _audioCtx.resume().catch(() => {});
   }
@@ -89,59 +99,83 @@ function getAudioCtx(): AudioContext | null {
 }
 
 /**
- * Play a short synthesized "tick" sound that mimics a haptic buzz.
- * This is the key fallback for Safari iOS where navigator.vibrate is unavailable.
- * Different intensities produce different tones:
- * - soft: 60Hz sine, 8ms (subtle tick)
- * - medium: 80Hz sine, 15ms (clearer tap)
- * - strong: 50Hz + 100Hz, 30ms (deep thump)
+ * Play a synthesized "haptic buzz" — a short burst that mimics physical vibration.
+ * This is the KEY fallback for Safari iOS where navigator.vibrate is unavailable.
+ *
+ * Technique: low-frequency sine wave + filtered noise burst = "thump" felt through speaker.
+ * Different intensities produce different perceptible feedback:
+ * - soft: 80Hz sine, 40ms (subtle tick)
+ * - medium: 60Hz sine + noise, 60ms (clear tap)
+ * - strong: 45Hz sine + noise + harmonic, 90ms (deep thump)
  */
-function playAudioTick(intensity: 'soft' | 'medium' | 'strong') {
+function playAudioHaptic(intensity: 'soft' | 'medium' | 'strong') {
   const ctx = getAudioCtx();
-  if (!ctx) return;
+  if (!ctx || !_masterGain) return;
   const now = ctx.currentTime;
 
+  // Resume context if suspended (Safari iOS requirement)
+  if (ctx.state === 'suspended') {
+    ctx.resume().catch(() => {});
+  }
+
+  const settings = {
+    soft: { freq: 80, duration: 0.04, vol: 0.15, noise: false },
+    medium: { freq: 60, duration: 0.06, vol: 0.25, noise: true },
+    strong: { freq: 45, duration: 0.09, vol: 0.4, noise: true },
+  }[intensity];
+
+  // 1. Low-frequency sine wave (the "thump")
+  const osc = ctx.createOscillator();
+  const oscGain = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(settings.freq, now);
+  // Slight frequency drop for "thump" character
+  osc.frequency.exponentialRampToValueAtTime(settings.freq * 0.7, now + settings.duration);
+  oscGain.gain.setValueAtTime(0.0001, now);
+  oscGain.gain.exponentialRampToValueAtTime(settings.vol, now + 0.005);
+  oscGain.gain.exponentialRampToValueAtTime(0.0001, now + settings.duration);
+  osc.connect(oscGain);
+  oscGain.connect(_masterGain);
+  osc.start(now);
+  osc.stop(now + settings.duration + 0.01);
+
+  // 2. Filtered noise burst (the "buzz" texture)
+  if (settings.noise) {
+    const noiseDuration = settings.duration * 0.8;
+    const bufferSize = Math.floor(ctx.sampleRate * noiseDuration);
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize); // fade out
+    }
+    const noiseSrc = ctx.createBufferSource();
+    noiseSrc.buffer = buffer;
+    const noiseFilter = ctx.createBiquadFilter();
+    noiseFilter.type = 'lowpass';
+    noiseFilter.frequency.value = settings.freq * 3; // keep only low freqs
+    noiseFilter.Q.value = 5;
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.value = settings.vol * 0.5;
+    noiseSrc.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(_masterGain);
+    noiseSrc.start(now);
+    noiseSrc.stop(now + noiseDuration);
+  }
+
+  // 3. For strong: add a harmonic for richer "thump"
   if (intensity === 'strong') {
-    // Deep thump: low frequency + harmonic
-    [50, 100].forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = freq;
-      const vol = i === 0 ? 0.3 : 0.15;
-      gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.exponentialRampToValueAtTime(vol, now + 0.005);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.03);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.04);
-    });
-  } else if (intensity === 'medium') {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.value = 80;
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.2, now + 0.003);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.015);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.02);
-  } else {
-    // soft
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.value = 60;
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.12, now + 0.002);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.008);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.01);
+    const osc2 = ctx.createOscillator();
+    const osc2Gain = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.value = settings.freq * 1.5; // fifth
+    osc2Gain.gain.setValueAtTime(0.0001, now);
+    osc2Gain.gain.exponentialRampToValueAtTime(settings.vol * 0.3, now + 0.008);
+    osc2Gain.gain.exponentialRampToValueAtTime(0.0001, now + settings.duration);
+    osc2.connect(osc2Gain);
+    osc2Gain.connect(_masterGain);
+    osc2.start(now);
+    osc2.stop(now + settings.duration + 0.01);
   }
 }
 
@@ -150,6 +184,11 @@ class HapticsService {
 
   setEnabled(v: boolean) {
     this.enabled = v;
+  }
+
+  /** Resume audio context (call on any user gesture) */
+  resume() {
+    getAudioCtx();
   }
 
   private hasVibration(): boolean {
@@ -168,6 +207,8 @@ class HapticsService {
   /** Soft tick for button presses */
   click() {
     if (!this.enabled) return;
+    // Resume audio context on every click (Safari iOS requirement)
+    this.resume();
     // 1. Telegram native (highest priority)
     if (this.inTelegram()) {
       try {
@@ -184,8 +225,8 @@ class HapticsService {
         /* ignore */
       }
     }
-    // 3. Audio tick fallback (Safari iOS, desktop — works EVERYWHERE)
-    playAudioTick('soft');
+    // 3. Audio haptic (ALL browsers — Safari iOS, desktop, etc.)
+    playAudioHaptic('soft');
     // 4. Visual pulse (all platforms)
     applyVisualPulse('soft');
   }
@@ -193,6 +234,7 @@ class HapticsService {
   /** Medium tap for selection */
   select() {
     if (!this.enabled) return;
+    this.resume();
     if (this.inTelegram()) {
       try {
         window.Telegram?.WebApp?.HapticFeedback?.selectionChanged();
@@ -207,13 +249,14 @@ class HapticsService {
         /* ignore */
       }
     }
-    playAudioTick('medium');
+    playAudioHaptic('medium');
     applyVisualPulse('medium');
   }
 
   /** Success pulse for insight gain */
   success() {
     if (!this.enabled) return;
+    this.resume();
     if (this.inTelegram()) {
       try {
         window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
@@ -228,9 +271,9 @@ class HapticsService {
         /* ignore */
       }
     }
-    // Double audio tick for success rhythm
-    playAudioTick('strong');
-    setTimeout(() => playAudioTick('medium'), 50);
+    // Double audio haptic for success rhythm
+    playAudioHaptic('strong');
+    setTimeout(() => playAudioHaptic('medium'), 60);
     applyVisualPulse('strong');
     showFlashOverlay();
   }
@@ -238,6 +281,7 @@ class HapticsService {
   /** Warning for negative insight */
   warning() {
     if (!this.enabled) return;
+    this.resume();
     if (this.inTelegram()) {
       try {
         window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('warning');
@@ -252,8 +296,8 @@ class HapticsService {
         /* ignore */
       }
     }
-    playAudioTick('strong');
-    setTimeout(() => playAudioTick('strong'), 70);
+    playAudioHaptic('strong');
+    setTimeout(() => playAudioHaptic('strong'), 80);
     applyVisualPulse('strong');
     showFlashOverlay();
   }
