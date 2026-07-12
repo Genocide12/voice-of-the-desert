@@ -122,7 +122,7 @@ export default function Home() {
     }
   }, [state?.currentKoanId, state?.awaitingChoice, state?.started, settings.voiceEnabled, settings.lang, settings.voiceGender]);
 
-  const lang = settings.lang;
+  const lang: Lang = settings.lang === 'en' ? 'en' : 'ru';
 
   const handleButtonClick = useCallback(() => {
     const audio = getAudioEngine();

@@ -1059,5 +1059,6 @@ export const BOT = {
 } as const;
 
 export function tr(loc: Localized, lang: 'ru' | 'en'): string {
-  return loc[lang] ?? loc.ru;
+  if (!loc) return '';
+  return loc[lang] ?? loc.ru ?? '';
 }

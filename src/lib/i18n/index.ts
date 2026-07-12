@@ -43,13 +43,15 @@ export function detectLang(): Lang {
 
 /** Translate a Localized object */
 export function t(loc: Localized, lang: Lang): string {
-  return loc[lang] ?? loc.ru;
+  if (!loc) return '';
+  return loc[lang] ?? loc.ru ?? '';
 }
 
 /** Translate a LocalizedList and pick a variation by seed */
 export function pickVariation(list: LocalizedList, lang: Lang, seed: number): string {
+  if (!list) return '';
   const arr = list[lang] ?? list.ru;
   if (!arr || arr.length === 0) return '';
   const idx = Math.abs(seed) % arr.length;
-  return arr[idx];
+  return arr[idx] ?? '';
 }
