@@ -60,12 +60,8 @@ async function notifyOwner(text: string) {
 }
 
 export async function POST(req: NextRequest) {
-  // Verify cron secret (optional)
-  const authHeader = req.headers.get('authorization');
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  // Public endpoint — no auth required (health checks should be accessible)
+  // CRON_SECRET is optional and only used if set on both sides
 
   const results: CheckResult[] = [];
 

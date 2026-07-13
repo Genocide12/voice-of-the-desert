@@ -13,7 +13,6 @@ jobs:
       - name: Call health check endpoint
         run: |
           RESPONSE=$(curl -s -w "\n%{http_code}" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "https://voice-of-the-desert-nine.vercel.app/api/health-check")
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
           BODY=$(echo "$RESPONSE" | head -n -1)
